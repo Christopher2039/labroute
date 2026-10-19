@@ -77,11 +77,12 @@ async function jsonRequest(baseUrl, pathname, options = {}, jar = {}) {
   };
 }
 
-test('LabRoute moments API', async (t) => {
+test('LabRoute moments review API', async (t) => {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'labroute-test-'));
   const contentDir = path.join(root, 'content');
   const dataDir = path.join(root, 'data');
   const uploadDir = path.join(root, 'uploads');
+  const pendingDir = path.join(dataDir, 'pending');
 
   await fsp.mkdir(contentDir, { recursive: true });
   await fsp.mkdir(dataDir, { recursive: true });
@@ -133,6 +134,7 @@ test('LabRoute moments API', async (t) => {
     dataDir,
     runtimeDir: path.join(dataDir, 'runtime'),
     uploadDir,
+    pendingDir,
     galleryFile: path.join(contentDir, 'gallery.json'),
     adminsFile: path.join(dataDir, 'admins.json'),
     secret: 'test-secret-that-is-long-enough-for-hmac',
@@ -163,7 +165,7 @@ test('LabRoute moments API', async (t) => {
     let visitorOne = {};
     let firstMomentId = '';
 
-    await t.test('a first-time visitor can upload a moment', async () => {
+    await t.test('an upload is stored as pending, not published', async () => {
       const status = await jsonRequest(
         baseUrl,
         '/api/moments/status',
@@ -185,7 +187,6 @@ test('LabRoute moments API', async (t) => {
             image: imgDataUrl(),
             caption: 'A new moment at the electronics bench',
             contributor: 'Ada',
-            email: 'ada@example.com',
             consent: true,
             website: ''
           })
@@ -195,29 +196,44 @@ test('LabRoute moments API', async (t) => {
 
       assert.equal(upload.status, 201);
       assert.equal(upload.json.ok, true);
-      assert.equal(upload.json.galleryCount, 4);
-      assert.equal(upload.json.gallery[0].caption, 'A new moment at the electronics bench');
-      assert.equal(upload.json.gallery[1].id, 'gal-old-1');
-      assert.equal(upload.json.gallery[2].id, 'gal-old-2');
-      assert.equal(upload.json.gallery[3].id, 'gal-old-3');
-      assert.equal(upload.json.notification.status, 'skipped');
+      assert.equal(upload.json.pending, true);
+      assert.equal(upload.json.pendingCount, 1);
       assert.equal(upload.json.canUpload, false);
       assert.ok(upload.json.retryAfterSeconds >= 1700);
+      assert.match(upload.json.message, /review/i);
       visitorOne = upload.jar;
 
       firstMomentId = upload.json.moment.id;
+      assert.equal(upload.json.moment.image, `/api/admin/pending/${firstMomentId}/image`);
+
+      // The public gallery must be untouched until approval.
+      const gallery = await jsonRequest(baseUrl, '/api/gallery');
+      assert.equal(gallery.json.gallery.length, 3);
+      assert.equal(gallery.json.gallery[0].id, 'gal-old-1');
 
       const diskGallery = JSON.parse(
         await fsp.readFile(path.join(contentDir, 'gallery.json'), 'utf8')
       );
-      assert.equal(diskGallery[0].id, firstMomentId);
-      assert.equal(diskGallery[0].image, `assets/gallery/moments/${firstMomentId}.png`);
-      assert.equal(diskGallery[3].id, 'gal-old-3');
+      assert.equal(diskGallery.length, 3);
 
-      const imageResponse = await fetch(`${baseUrl}/${upload.json.moment.image}`);
-      assert.equal(imageResponse.status, 200);
-      assert.equal(imageResponse.headers.get('content-type'), 'image/png');
-      assert.equal((await imageResponse.arrayBuffer()).byteLength > 0, true);
+      // The photo lives in the private pending folder.
+      const pendingFiles = await fsp.readdir(pendingDir);
+      assert.ok(pendingFiles.includes(`${firstMomentId}.png`));
+      assert.ok(pendingFiles.includes('pending.json'));
+
+      const manifest = JSON.parse(
+        await fsp.readFile(path.join(pendingDir, 'pending.json'), 'utf8')
+      );
+      assert.equal(manifest.length, 1);
+      assert.equal(manifest[0].caption, 'A new moment at the electronics bench');
+    });
+
+    await t.test('pending files are not reachable over the static server', async () => {
+      const manifest = await fetch(`${baseUrl}/data/pending/pending.json`);
+      assert.equal(manifest.status, 404);
+
+      const image = await fetch(`${baseUrl}/data/pending/${firstMomentId}.png`);
+      assert.equal(image.status, 404);
     });
 
     await t.test('the same visitor is held to a 30 minute cooldown', async () => {
@@ -240,15 +256,6 @@ test('LabRoute moments API', async (t) => {
       assert.equal(upload.json.error, 'cooldown_active');
       assert.ok(upload.json.retryAfterSeconds > 0);
       assert.ok(Number(upload.response.headers.get('retry-after')) > 0);
-
-      const status = await jsonRequest(
-        baseUrl,
-        '/api/moments/status',
-        { headers: { 'X-Labroute-Device': 'device-one-12345' } },
-        visitorOne
-      );
-      assert.equal(status.json.canUpload, false);
-      assert.ok(status.json.nextAllowedAt);
     });
 
     await t.test('clearing the visitor cookie does not reset the device cooldown', async () => {
@@ -272,6 +279,7 @@ test('LabRoute moments API', async (t) => {
     });
 
     let visitorTwo = {};
+    let secondMomentId = '';
 
     await t.test('another visitor is not affected by the first cooldown', async () => {
       const upload = await jsonRequest(
@@ -291,10 +299,9 @@ test('LabRoute moments API', async (t) => {
       );
 
       assert.equal(upload.status, 201);
-      assert.equal(upload.json.galleryCount, 5);
+      assert.equal(upload.json.pendingCount, 2);
       assert.notEqual(upload.json.moment.id, firstMomentId);
-      assert.equal(upload.json.gallery[0].id, upload.json.moment.id);
-      assert.equal(upload.json.gallery[1].id, firstMomentId);
+      secondMomentId = upload.json.moment.id;
       visitorTwo = upload.jar;
       assert.ok(visitorTwo.labroute_visitor);
     });
@@ -363,24 +370,16 @@ test('LabRoute moments API', async (t) => {
       assert.equal(hugeImage.status, 413);
     });
 
-    await t.test('recent moments and gallery stay in sync', async () => {
-      const recent = await jsonRequest(baseUrl, '/api/moments/recent?limit=10');
-      assert.equal(recent.status, 200);
-      assert.equal(recent.json.moments.length, 2);
-      assert.equal(recent.json.moments[0].caption, 'A different student at the workshop');
-
-      const gallery = await jsonRequest(baseUrl, '/api/gallery');
-      assert.equal(gallery.json.gallery.length, 5);
-      assert.equal(gallery.json.gallery[0].uploaded, true);
-      assert.equal(gallery.json.gallery[1].uploaded, true);
-      assert.equal(gallery.json.gallery[2].uploaded, false);
-    });
-
     let adminJar = {};
 
-    await t.test('admin authentication and the moments inbox work', async () => {
-      const unauthorised = await jsonRequest(baseUrl, '/api/admin/moments');
+    await t.test('admins can list and preview pending photos', async () => {
+      const unauthorised = await jsonRequest(baseUrl, '/api/admin/pending');
       assert.equal(unauthorised.status, 401);
+
+      const imageUnauthorised = await fetch(
+        `${baseUrl}/api/admin/pending/${firstMomentId}/image`
+      );
+      assert.equal(imageUnauthorised.status, 401);
 
       const wrong = await jsonRequest(baseUrl, '/api/admin/login', {
         method: 'POST',
@@ -400,14 +399,95 @@ test('LabRoute moments API', async (t) => {
       const session = await jsonRequest(baseUrl, '/api/admin/session', {}, adminJar);
       assert.equal(session.json.authenticated, true);
 
-      const inbox = await jsonRequest(baseUrl, '/api/admin/moments', {}, adminJar);
-      assert.equal(inbox.status, 200);
-      assert.equal(inbox.json.total, 2);
-      assert.equal(inbox.json.moments.length, 2);
-      assert.equal(inbox.json.moments[0].caption, 'A different student at the workshop');
-      assert.equal(inbox.json.moments[1].uploaderEmail, 'ada@example.com');
-      assert.equal(inbox.json.moments[1].notification.status, 'skipped');
+      const pending = await jsonRequest(baseUrl, '/api/admin/pending', {}, adminJar);
+      assert.equal(pending.status, 200);
+      assert.equal(pending.json.count, 2);
+      assert.equal(pending.json.liveCount, 3);
+      assert.equal(pending.json.pending.length, 2);
+      assert.equal(pending.json.pending[0].caption, 'A different student at the workshop');
+      assert.equal(pending.json.pending[1].caption, 'A new moment at the electronics bench');
+      assert.equal(pending.json.pending[0].image, `/api/admin/pending/${secondMomentId}/image`);
 
+      const image = await fetch(`${baseUrl}/api/admin/pending/${firstMomentId}/image`, {
+        headers: { Cookie: cookieHeader(adminJar) }
+      });
+      assert.equal(image.status, 200);
+      assert.equal(image.headers.get('content-type'), 'image/png');
+      assert.equal((await image.arrayBuffer()).byteLength > 0, true);
+    });
+
+    await t.test('approving moves the photo into the gallery as image 1', async () => {
+      const approve = await jsonRequest(
+        baseUrl,
+        `/api/admin/pending/${firstMomentId}/approve`,
+        { method: 'POST' },
+        adminJar
+      );
+
+      assert.equal(approve.status, 200);
+      assert.equal(approve.json.pendingCount, 1);
+      assert.equal(approve.json.galleryCount, 4);
+      assert.equal(approve.json.gallery[0].id, firstMomentId);
+      assert.equal(approve.json.gallery[1].id, 'gal-old-1');
+      assert.equal(approve.json.gallery[2].id, 'gal-old-2');
+      assert.equal(approve.json.gallery[3].id, 'gal-old-3');
+      assert.equal(approve.json.moment.image, `assets/gallery/moments/${firstMomentId}.png`);
+
+      const diskGallery = JSON.parse(
+        await fsp.readFile(path.join(contentDir, 'gallery.json'), 'utf8')
+      );
+      assert.equal(diskGallery.length, 4);
+      assert.equal(diskGallery[0].id, firstMomentId);
+      assert.equal(diskGallery[1].id, 'gal-old-1');
+
+      // The photo is now served from the public gallery folder, not pending.
+      const image = await fetch(`${baseUrl}/assets/gallery/moments/${firstMomentId}.png`);
+      assert.equal(image.status, 200);
+      assert.equal(image.headers.get('content-type'), 'image/png');
+
+      const pendingFiles = await fsp.readdir(pendingDir);
+      assert.equal(pendingFiles.includes(`${firstMomentId}.png`), false);
+      assert.ok((await fsp.stat(path.join(uploadDir, `${firstMomentId}.png`))).isFile());
+
+      const gallery = await jsonRequest(baseUrl, '/api/gallery');
+      assert.equal(gallery.json.gallery.length, 4);
+      assert.equal(gallery.json.gallery[0].caption, 'A new moment at the electronics bench');
+
+      const recent = await jsonRequest(baseUrl, '/api/moments/recent?limit=10');
+      assert.equal(recent.json.moments.length, 1);
+
+      const repeated = await jsonRequest(
+        baseUrl,
+        `/api/admin/pending/${firstMomentId}/approve`,
+        { method: 'POST' },
+        adminJar
+      );
+      assert.equal(repeated.status, 404);
+    });
+
+    await t.test('declining removes a pending photo without touching the gallery', async () => {
+      const decline = await jsonRequest(
+        baseUrl,
+        `/api/admin/pending/${secondMomentId}/reject`,
+        { method: 'POST' },
+        adminJar
+      );
+
+      assert.equal(decline.status, 200);
+      assert.equal(decline.json.pendingCount, 0);
+
+      const pendingFiles = await fsp.readdir(pendingDir);
+      assert.equal(pendingFiles.includes(`${secondMomentId}.png`), false);
+
+      const gallery = await jsonRequest(baseUrl, '/api/gallery');
+      assert.equal(gallery.json.gallery.length, 4);
+
+      const pending = await jsonRequest(baseUrl, '/api/admin/pending', {}, adminJar);
+      assert.equal(pending.json.count, 0);
+      assert.equal(pending.json.liveCount, 4);
+    });
+
+    await t.test('logout ends the admin session', async () => {
       const logout = await jsonRequest(
         baseUrl,
         '/api/admin/logout',
@@ -417,7 +497,7 @@ test('LabRoute moments API', async (t) => {
       assert.equal(logout.status, 200);
       adminJar = logout.jar;
 
-      const afterLogout = await jsonRequest(baseUrl, '/api/admin/moments', {}, adminJar);
+      const afterLogout = await jsonRequest(baseUrl, '/api/admin/pending', {}, adminJar);
       assert.equal(afterLogout.status, 401);
     });
 

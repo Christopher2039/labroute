@@ -1,9 +1,8 @@
 /**
- * Lab Moments upload page.
+ * LabRoute — share a lab moment.
  *
- * The page is intentionally dependency-free: it previews the chosen photo in
- * the browser, sends it as a data URL to the LabRoute upload service, and
- * mirrors the server-side cooldown in the interface.
+ * The photo is previewed locally, then sent to the review queue. Nothing is
+ * published until an administrator approves it from the dashboard.
  */
 (function () {
   'use strict';
@@ -45,7 +44,6 @@
       'caption',
       'captionCount',
       'contributor',
-      'uploaderEmail',
       'consent',
       'website',
       'formAlert',
@@ -53,17 +51,12 @@
       'submitLabel',
       'uploadPanel',
       'successPanel',
-      'successImage',
       'successMessage',
-      'successCaption',
-      'successMeta',
       'shareAnotherBtn',
       'successCooldown'
     ];
 
-    for (const id of required) {
-      el[id] = document.getElementById(id);
-    }
+    for (const id of required) el[id] = document.getElementById(id);
 
     if (!el.momentForm || !el.dropzone || !el.photoInput) return;
 
@@ -86,8 +79,6 @@
     el.momentForm.addEventListener('submit', handleSubmit);
     el.shareAnotherBtn.addEventListener('click', startAnother);
 
-    // Stop the browser from navigating away when a file is dropped outside the
-    // dropzone, without swallowing drops that belong to the picker.
     ['dragover', 'drop'].forEach((type) => {
       document.addEventListener(type, (event) => {
         if (!event.target.closest || !event.target.closest('#dropzone')) {
@@ -106,7 +97,6 @@
   function getDeviceId() {
     try {
       const existing = window.localStorage.getItem(DEVICE_STORAGE_KEY);
-
       if (existing && /^[A-Za-z0-9_-]{8,128}$/.test(existing)) return existing;
 
       let generated = '';
@@ -131,15 +121,11 @@
   }
 
   function apiHeaders(extra) {
-    const headers = Object.assign(
-      {
-        Accept: 'application/json'
-      },
+    return Object.assign(
+      { Accept: 'application/json' },
       state.deviceId ? { 'X-Labroute-Device': state.deviceId } : {},
       extra || {}
     );
-
-    return headers;
   }
 
   function isCoolingDown() {
@@ -164,18 +150,6 @@
     if (!Number.isFinite(bytes) || bytes < 1024) return `${Math.max(0, Math.round(bytes || 0))} B`;
     if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  }
-
-  function formatDate(value) {
-    const date = value ? new Date(value) : new Date();
-
-    if (Number.isNaN(date.getTime())) return '';
-
-    return date.toLocaleDateString(undefined, {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    });
   }
 
   function fileExtension(file) {
@@ -245,9 +219,7 @@
 
     if (file.size > state.maxBytes) {
       showAlert(
-        `That photo is ${formatBytes(file.size)}. Please choose one under ${formatBytes(
-          state.maxBytes
-        )}.`
+        `That photo is ${formatBytes(file.size)}. Please choose one under ${formatBytes(state.maxBytes)}.`
       );
       resetFileInput();
       return;
@@ -308,9 +280,10 @@
   function startCooldown(until, reason) {
     const timestamp = Number(until);
 
-    state.cooldownUntil = Number.isFinite(timestamp) && timestamp > Date.now()
-      ? timestamp
-      : Date.now() + state.cooldownMinutes * 60 * 1000;
+    state.cooldownUntil =
+      Number.isFinite(timestamp) && timestamp > Date.now()
+        ? timestamp
+        : Date.now() + state.cooldownMinutes * 60 * 1000;
     state.cooldownReason = reason === 'network' ? 'network' : 'visitor';
 
     if (state.cooldownTimer) {
@@ -410,11 +383,7 @@
 
     el.submitBtn.classList.toggle('is-busy', isBusy);
     el.submitBtn.setAttribute('aria-busy', isBusy ? 'true' : 'false');
-    el.submitLabel.textContent = isBusy ? 'Publishing…' : 'Publish my moment';
-
-    if (!isBusy && el.submitLabel.textContent === 'Publishing…') {
-      el.submitLabel.textContent = 'Publish my moment';
-    }
+    el.submitLabel.textContent = isBusy ? 'Sending…' : 'Send for review';
 
     updateSubmitState();
   }
@@ -468,7 +437,8 @@
       const reader = new FileReader();
 
       reader.onload = () => resolve(reader.result);
-      reader.onerror = () => reject(new Error('That file could not be read. Please try another photo.'));
+      reader.onerror = () =>
+        reject(new Error('That file could not be read. Please try another photo.'));
       reader.readAsDataURL(file);
     });
   }
@@ -503,14 +473,6 @@
       return;
     }
 
-    const email = el.uploaderEmail.value.trim();
-
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
-      showAlert('That email address does not look right. You can also leave it blank.');
-      el.uploaderEmail.focus();
-      return;
-    }
-
     if (isCoolingDown()) {
       showAlert('Your sharing cooldown is still active. Please wait for the timer to finish.');
       return;
@@ -529,7 +491,6 @@
           image: dataUrl,
           caption,
           contributor: el.contributor.value.trim(),
-          email,
           consent: true,
           website: el.website ? el.website.value : ''
         })
@@ -558,12 +519,10 @@
           showAlert('That image is larger than the upload limit. Please choose a smaller photo.');
         } else if (response.status === 415) {
           showAlert('Please choose a JPEG, PNG, or WebP photo.');
-        } else if (response.status === 400 && data.message) {
+        } else if (data.message) {
           showAlert(data.message);
         } else {
-          showAlert(
-            data.message || 'We could not publish that moment right now. Please try again.'
-          );
+          showAlert('We could not send that moment right now. Please try again.');
         }
 
         return;
@@ -584,23 +543,9 @@
   /* --------------------------------------------------------------- success */
 
   function showSuccess(data) {
-    const moment = data.moment || {};
-    const galleryCount = Number(data.galleryCount) || 0;
-    const imageUrl = moment.image ? `/${String(moment.image).replace(/^\/+/, '')}` : '';
-
-    if (imageUrl) {
-      el.successImage.src = imageUrl;
-      el.successImage.alt = moment.caption || 'Your published lab moment';
-    } else {
-      el.successImage.removeAttribute('src');
+    if (data.message) {
+      el.successMessage.textContent = data.message;
     }
-
-    el.successCaption.textContent = moment.caption || el.caption.value.trim();
-    el.successMeta.textContent = `Image 1 · ${galleryCount} moment${
-      galleryCount === 1 ? '' : 's'
-    } in the gallery · ${formatDate(moment.uploadedAt)}`;
-
-    if (data.message) el.successMessage.textContent = data.message;
 
     el.uploadPanel.hidden = true;
     el.successPanel.hidden = false;
@@ -620,10 +565,6 @@
 
     el.successPanel.hidden = true;
     el.uploadPanel.hidden = false;
-    el.successImage.removeAttribute('src');
-    el.successCaption.textContent = '';
-    el.successMeta.textContent = '';
-    el.successCooldown.textContent = '';
 
     el.momentForm.reset();
     updateCaptionCount();

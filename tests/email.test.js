@@ -13,11 +13,9 @@ const moment = {
   uploadedAt: '2026-10-19T12:00:00.000Z'
 };
 
-const uploader = { name: 'Ada', email: 'ada@example.com' };
+const contributor = 'Ada';
 const links = {
-  imageUrl: 'https://labroute.example/assets/gallery/moments/moment-test-1.png',
-  galleryUrl: 'https://labroute.example/index.html#Gallery',
-  dashboardUrl: 'https://labroute.example/dashboard.html#moments'
+  dashboardUrl: 'https://labroute.example/dashboard.html#pending'
 };
 
 function configWith(email) {
@@ -57,7 +55,7 @@ test('email notifications', async (t) => {
     const result = await notifyMomentUpload({
       config: configWith({ provider: 'formspree' }),
       moment,
-      uploader,
+      contributor,
       links
     });
 
@@ -66,16 +64,16 @@ test('email notifications', async (t) => {
     assert.equal(captured.url, 'https://formspree.io/f/test-form');
     assert.equal(captured.body.momentId, moment.id);
     assert.equal(captured.body.caption, moment.caption);
-    assert.equal(captured.body.uploaderEmail, uploader.email);
     assert.equal(
       captured.body.adminEmails,
       'admin-one@example.com, admin-two@example.com'
     );
-    assert.match(captured.body.message, /image 1/i);
-    assert.match(captured.body.message, /moved one position to the right/i);
+    assert.equal(captured.body.event, 'lab_moment.pending');
+    assert.match(captured.body.message, /waiting for an admin decision/i);
+    assert.match(captured.body.message, /Approve it to make it image 1/i);
   });
 
-  await t.test('Resend sends to every admin and sets a reply-to address', async () => {
+  await t.test('Resend sends to every admin with review links', async () => {
     let captured = null;
 
     global.fetch = async (url, options) => {
@@ -89,7 +87,7 @@ test('email notifications', async (t) => {
     const result = await notifyMomentUpload({
       config: configWith({ provider: 'resend', resendApiKey: 're_test', resendFrom: 'LabRoute <hello@labroute.example>' }),
       moment,
-      uploader,
+      contributor,
       links
     });
 
@@ -97,10 +95,10 @@ test('email notifications', async (t) => {
     assert.equal(result.status, 'sent');
     assert.equal(captured.url, 'https://api.resend.com/emails');
     assert.deepEqual(captured.body.to, ['admin-one@example.com', 'admin-two@example.com']);
-    assert.equal(captured.body.reply_to, uploader.email);
     assert.equal(captured.body.from, 'LabRoute <hello@labroute.example>');
     assert.match(captured.body.html, /Calibrating the oscilloscope/);
-    assert.match(captured.body.html, /Open admin inbox/);
+    assert.match(captured.body.html, /Review in the dashboard/);
+    assert.match(captured.body.html, /Pending approval/);
   });
 
   await t.test('provider failures are reported, never thrown', async () => {
@@ -113,7 +111,7 @@ test('email notifications', async (t) => {
     const result = await notifyMomentUpload({
       config: configWith({ provider: 'resend', resendApiKey: 're_test' }),
       moment,
-      uploader,
+      contributor,
       links
     });
 
@@ -131,7 +129,7 @@ test('email notifications', async (t) => {
     const result = await notifyMomentUpload({
       config: configWith({ provider: 'none' }),
       moment,
-      uploader,
+      contributor,
       links
     });
 

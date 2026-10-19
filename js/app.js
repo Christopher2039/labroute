@@ -97,17 +97,6 @@ function safeImageSource(value) {
   return '';
 }
 
-function formatMomentDate(value) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric'
-  });
-}
-
 // 2. Render Gallery HTML (Masonry Layout)
 function renderGallery(items) {
   const container = document.getElementById('galleryMasonryGrid');
@@ -133,12 +122,7 @@ function renderGallery(items) {
       const shapeClass = shapes[index % shapes.length];
       const caption = item.caption || item.title || 'A moment from the LabRoute archive';
       const image = safeImageSource(item.image);
-      const meta = [];
-
-      if (item.contributor) meta.push(item.contributor);
-      const uploadedOn = formatMomentDate(item.uploadedAt);
-      if (uploadedOn) meta.push(uploadedOn);
-      if (!meta.length) meta.push('LabRoute archive');
+      const contributor = String(item.contributor || '').trim();
 
       return `
       <figure class="gallery-card ${shapeClass}">
@@ -146,7 +130,7 @@ function renderGallery(items) {
         <img src="${escapeHtml(image)}" alt="${escapeHtml(caption)}" class="gallery-image" loading="lazy" />
         <figcaption class="gallery-caption">
           <h4>${escapeHtml(caption)}</h4>
-          <p>${escapeHtml(meta.join(' • '))}</p>
+          ${contributor ? `<p>${escapeHtml(contributor)}</p>` : ''}
         </figcaption>
       </figure>`;
     })

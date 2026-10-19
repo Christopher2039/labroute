@@ -310,8 +310,6 @@
   overflow: hidden;
   position: relative;
   box-shadow: var(--shadow-sm);
-  transition: transform var(--transition-normal), box-shadow var(--transition-normal);
-  cursor: pointer;
 }
 
 .gallery-card.tall {
@@ -331,78 +329,62 @@
   height: 100%;
   object-fit: cover;
   display: block;
-  transition: transform 0.6s ease;
 }
 
-.gallery-card:hover {
-  transform: translateY(-4px) scale(1.02);
-  box-shadow: var(--shadow-md);
-}
-
-.gallery-card:hover .gallery-image {
-  transform: scale(1.05);
-}
-
-/* Desktop Hover Overlay */
+/* Caption stays visible at the bottom, like the mobile gallery. */
 .gallery-caption {
   position: absolute;
-  inset: 0;
-  background: rgba(0, 33, 71, 0.85);
-  color: var(--text-inverse);
+  inset: auto 0 0 0;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
-  padding: 1.5rem;
-  opacity: 0;
-  transition: opacity var(--transition-normal);
-}
-
-.gallery-card:hover .gallery-caption {
-  opacity: 1;
+  gap: 0.15rem;
+  padding: 2.75rem 1rem 0.9rem;
+  text-align: left;
+  color: #ffffff;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 33, 71, 0) 0%,
+    rgba(0, 33, 71, 0.28) 45%,
+    rgba(0, 33, 71, 0.55) 100%
+  );
 }
 
 .gallery-caption h4 {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
   font-family: var(--font-serif);
-  font-size: 1.1rem;
-  color: var(--accent);
-  margin-bottom: 0.25rem;
+  font-size: 0.98rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .gallery-caption p {
-  font-size: 0.813rem;
-  color: var(--text-inverse-muted);
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.82);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 /* Community upload entry point inside the gallery */
 .gallery-upload-banner {
   max-width: 1000px;
-  margin: 0 auto 2.5rem;
-  padding: 1.5rem 1.75rem;
+  margin: 0 auto 2rem;
+  padding: 1.1rem 1.4rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 2rem;
-  background: linear-gradient(135deg, #001849 0%, #002147 58%, #00346b 100%);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
-  color: var(--text-inverse);
-  position: relative;
-  overflow: hidden;
-}
-
-.gallery-upload-banner::after {
-  content: "";
-  position: absolute;
-  width: 220px;
-  height: 220px;
-  right: -70px;
-  top: -120px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(212, 175, 55, 0.22) 0%, rgba(212, 175, 55, 0) 70%);
-  pointer-events: none;
+  gap: 1.5rem;
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-main);
 }
 
 .gallery-upload-copy {
@@ -416,41 +398,37 @@
 
 .gallery-upload-icon {
   flex: 0 0 auto;
-  width: 48px;
-  height: 48px;
+  width: 42px;
+  height: 42px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-md);
-  background: rgba(212, 175, 55, 0.14);
-  border: 1px solid rgba(212, 175, 55, 0.4);
-  color: var(--accent);
-  font-size: 24px;
+  border-radius: 50%;
+  background: var(--surface-tint);
+  border: 1px solid var(--border);
+  color: var(--primary);
+  font-size: 21px;
 }
 
 .gallery-upload-title {
+  margin-bottom: 0.2rem;
   font-family: var(--font-serif);
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   font-weight: 700;
-  color: #ffffff;
-  margin-bottom: 0.3rem;
+  color: var(--primary);
 }
 
 .gallery-upload-text {
-  font-size: 0.9rem;
-  line-height: 1.55;
-  color: rgba(255, 255, 255, 0.76);
   max-width: 560px;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--text-muted);
 }
 
 .gallery-upload-actions {
   flex: 0 0 auto;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.6rem;
-  position: relative;
-  z-index: 1;
+  align-items: center;
 }
 
 .gallery-upload-btn {
@@ -459,22 +437,6 @@
 
 .gallery-upload-btn .material-symbols-outlined {
   font-size: 19px;
-}
-
-.gallery-upload-note {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.02em;
-  color: rgba(255, 255, 255, 0.66);
-  text-align: right;
-}
-
-.gallery-upload-note .material-symbols-outlined {
-  font-size: 15px;
-  color: var(--accent);
 }
 
 .gallery-new-badge {
@@ -686,11 +648,6 @@
     width: 100%;
   }
 
-  .gallery-upload-note {
-    justify-content: center;
-    text-align: center;
-  }
-
   .gallery-masonry {
     display: flex;
     flex-direction: row;
@@ -719,12 +676,15 @@
     box-shadow: var(--shadow-md);
   }
 
-  /* Since touch screens don't have mouse hover, anchor caption at bottom */
   .gallery-caption {
     inset: auto 0 0 0;
-    opacity: 1;
-    background: linear-gradient(180deg, transparent 0%, rgba(0, 33, 71, 0.92) 100%);
-    padding: 3rem 1.25rem 1.25rem;
+    background: linear-gradient(
+      180deg,
+      rgba(0, 33, 71, 0) 0%,
+      rgba(0, 33, 71, 0.28) 45%,
+      rgba(0, 33, 71, 0.55) 100%
+    );
+    padding: 2.75rem 1rem 0.9rem;
     align-items: flex-start;
     text-align: left;
   }

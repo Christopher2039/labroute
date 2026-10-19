@@ -11,20 +11,24 @@ Oboh Christopher - Team Member and Report Author
 
 ## Community Lab Moments
 
-The gallery on the home page now accepts visitor photos. A visitor can preview a
-JPEG, PNG, or WebP image on `upload.html`, publish it, and the photo immediately
-becomes **image 1** of `content/gallery.json`. Every existing image moves one
-place to the right, so the old image 1 becomes image 2, and so on.
+The gallery on the home page accepts visitor photos, but nothing is published
+immediately. A visitor previews a JPEG, PNG, or WebP image on `upload.html` and
+sends it for review. The photo is stored in the private `data/pending/` folder
+and listed under **Pending uploads** on `dashboard.html`, where an admin can:
+
+- **Approve** — the file moves to `assets/gallery/moments/` and becomes **image 1**
+  of `content/gallery.json`. Every existing image shifts one place to the right.
+- **Decline** — the file and its entry are deleted.
 
 Each visitor is held to **one upload every 30 minutes**. The cooldown is scoped
 to that visitor (a signed HttpOnly cookie plus a browser-local device id), so one
 person uploading does not block anybody else. A hashed network guard also limits
 bursts from a single network without storing raw IP addresses. No account is
-required.
+required, and the upload page never asks for an email address.
 
-When a photo is published, the admin team receives an email notification. The
-admin dashboard also has a live **Community Lab Moments** inbox that shows the
-newest uploads and the delivery state of each alert.
+When a photo arrives for review, the admin team receives an email notification.
+The admin dashboard also shows the pending queue with the photo, caption, and
+submitting visitor's name.
 
 ### Run the site
 
@@ -45,12 +49,14 @@ npm run dev
 
 | Path | Purpose |
 | --- | --- |
-| `content/gallery.json` | Ordered gallery. The first item is displayed first. |
-| `assets/gallery/moments/` | Uploaded images, named with unguessable ids. |
+| `content/gallery.json` | Ordered public gallery. The first item is displayed first. |
+| `assets/gallery/moments/` | Approved images, named with unguessable ids. |
+| `data/pending/` | Photos awaiting review plus `pending.json`. Private, never served statically, and gitignored. |
 | `data/runtime/` | Generated cookie secret, hashed cooldown state, and the notification log. This directory is gitignored. |
 
-Run `npm test` to execute the integration suite (uploads, gallery ordering,
-per-visitor cooldowns, validation, admin authentication, and the inbox).
+Run `npm test` to execute the integration suite (pending uploads, approval and
+decline, gallery ordering, per-visitor cooldowns, validation, admin
+authentication, and the review queue).
 
 ### Email notifications
 
@@ -71,9 +77,9 @@ Admin addresses are read from `data/admins.json`; override them with
 
 ### Deployment note
 
-This feature needs a Node process with a **persistent disk** for the gallery
-images and cooldown state. It cannot run on a purely static Vercel deployment.
-Deploy the repository to a Node host (Render, Railway, Fly.io, a VPS, or any
-Node-capable host), or add external object storage plus serverless functions
-before deploying the API to Vercel. The home page still falls back to
+This feature needs a Node process with a **persistent disk** for the pending
+queue, gallery images, and cooldown state. It cannot run on a purely static
+Vercel deployment. Deploy the repository to a Node host (Render, Railway, Fly.io,
+a VPS, or any Node-capable host), or add external object storage plus serverless
+functions before deploying the API to Vercel. The home page still falls back to
 `content/gallery.json` if the upload service is offline.

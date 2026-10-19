@@ -2,6 +2,9 @@
 data/runtime/
 data/private/
 
+# Uploads waiting for admin approval
+data/pending/
+
 # Local environment configuration
 .env
 .env.local

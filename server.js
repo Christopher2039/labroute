@@ -8,9 +8,10 @@ const path = require('path');
 const adminAuth = require('./lib/admin-auth');
 const { loadConfig } = require('./lib/config');
 const { loadEnvFile } = require('./lib/env');
-const { loadAdminEmails, logNotification, notifyMomentUpload, readNotificationLog, resolveProvider } = require('./lib/email');
+const { loadAdminEmails, logNotification, notifyMomentUpload, resolveProvider } = require('./lib/email');
 const { GalleryStore } = require('./lib/gallery-store');
 const { MomentsService } = require('./lib/moments-service');
+const { PendingStore } = require('./lib/pending-store');
 const { RateLimitStore } = require('./lib/rate-limit');
 const {
   HttpError,
@@ -369,42 +370,61 @@ async function handleAdminApi(req, res, pathname, url, ctx) {
     });
   }
 
-  if (pathname === '/api/admin/moments') {
+  if (pathname === '/api/admin/pending') {
     if (method !== 'GET') return sendMethodNotAllowed(res, ['GET']);
 
     const session = requireAdmin(req, config);
-    const limit = Math.min(60, toPositiveInt(url.searchParams.get('limit'), 12));
-    const publicGallery = await galleryStore.publicGallery();
-    const uploads = publicGallery.filter((item) => item.uploaded);
-    const recent = uploads.slice(0, limit);
-    const notifications = await readNotificationLog(config, 400);
-    const latestByMoment = new Map();
-
-    // Entries are oldest first, so the last one wins for each moment.
-    for (const entry of notifications) {
-      if (entry?.momentId) latestByMoment.set(entry.momentId, entry);
-    }
+    const pending = await ctx.moments.listPending();
+    const gallery = await galleryStore.publicGallery();
 
     return sendJson(res, 200, {
       ok: true,
       admin: session.email,
-      total: uploads.length,
-      count: recent.length,
-      moments: recent.map((moment) => {
-        const notification = latestByMoment.get(moment.id);
-        return {
-          ...moment,
-          uploaderEmail: notification?.uploaderEmail || '',
-          notification: notification
-            ? {
-                provider: notification.provider || 'none',
-                status: notification.status || 'unknown',
-                error: notification.error || null,
-                at: notification.at || null
-              }
-            : null
-        };
-      })
+      count: pending.length,
+      pending,
+      liveCount: gallery.length
+    });
+  }
+
+  const pendingImage = /^\/api\/admin\/pending\/([A-Za-z0-9_-]{4,80})\/image$/.exec(pathname);
+  if (pendingImage) {
+    if (method !== 'GET') return sendMethodNotAllowed(res, ['GET']);
+
+    requireAdmin(req, config);
+    const file = await ctx.moments.getPendingFile(pendingImage[1]);
+
+    res.writeHead(200, {
+      'Content-Type': file.mime,
+      'Content-Length': file.buffer.length,
+      'Cache-Control': 'no-store'
+    });
+    res.end(file.buffer);
+    return undefined;
+  }
+
+  const pendingAction = /^\/api\/admin\/pending\/([A-Za-z0-9_-]{4,80})\/(approve|reject)$/.exec(pathname);
+  if (pendingAction) {
+    if (method !== 'POST') return sendMethodNotAllowed(res, ['POST']);
+
+    const session = requireAdmin(req, config);
+    const [, id, action] = pendingAction;
+
+    if (action === 'approve') {
+      const result = await ctx.moments.approvePending(id);
+      return sendJson(res, 200, {
+        ok: true,
+        admin: session.email,
+        message: 'Approved. The photo is now image 1 in the gallery.',
+        ...result
+      });
+    }
+
+    const result = await ctx.moments.rejectPending(id);
+    return sendJson(res, 200, {
+      ok: true,
+      admin: session.email,
+      message: 'Declined. The photo was removed.',
+      ...result
     });
   }
 
@@ -471,15 +491,13 @@ async function handleApi(req, res, pathname, url, ctx) {
     const result = await moments.createMoment(body, identity);
     const origin = requestOrigin(req, config.publicBaseUrl);
     const links = {
-      imageUrl: `${origin}/${result.moment.image}`,
-      galleryUrl: `${origin}/index.html#Gallery`,
-      dashboardUrl: `${origin}/dashboard.html#moments`
+      dashboardUrl: `${origin}/dashboard.html#pending`
     };
 
     const notification = await notifyMomentUpload({
       config,
       moment: result.moment,
-      uploader: result.uploader,
+      contributor: result.moment.contributor,
       links
     });
 
@@ -487,7 +505,6 @@ async function handleApi(req, res, pathname, url, ctx) {
       momentId: result.moment.id,
       caption: result.moment.caption,
       contributor: result.moment.contributor || 'Anonymous contributor',
-      uploaderEmail: result.uploader.email || '',
       provider: notification.provider,
       status: notification.status,
       error: notification.error || null,
@@ -498,11 +515,10 @@ async function handleApi(req, res, pathname, url, ctx) {
     return sendJson(res, 201, {
       ok: true,
       message:
-        'Your moment is now image 1 in the LabRoute gallery. Every existing photo moved one place to the right.',
+        'Your photo was sent to the admin team for review. Once approved, it becomes image 1 in the gallery.',
+      pending: true,
       moment: result.moment,
-      image: result.image,
-      gallery: result.gallery,
-      galleryCount: result.gallery.length,
+      pendingCount: result.pendingCount,
       notification: {
         provider: notification.provider,
         status: notification.status
@@ -558,6 +574,7 @@ function resolveStaticFile(pathname, config) {
   if (BLOCKED_STATIC_ROOTS.has(segments[0]) || BLOCKED_STATIC_ROOTS.has(normalized)) return null;
   if (normalized === 'data/runtime' || normalized.startsWith('data/runtime/')) return null;
   if (normalized === 'data/private' || normalized.startsWith('data/private/')) return null;
+  if (normalized === 'data/pending' || normalized.startsWith('data/pending/')) return null;
 
   const root = path.resolve(config.rootDir);
   const file = path.resolve(root, normalized);
@@ -673,11 +690,13 @@ function createApp(overrides = {}) {
   const config = loadConfig(overrides);
   const galleryStore = new GalleryStore(config);
   const rateLimits = new RateLimitStore(config.rateLimitFile, config.rateLimit);
-  const moments = new MomentsService({ config, galleryStore, rateLimits });
+  const pendingStore = new PendingStore(config);
+  const moments = new MomentsService({ config, galleryStore, rateLimits, pendingStore });
   const ctx = {
     config,
     galleryStore,
     rateLimits,
+    pendingStore,
     moments,
     loginAttempts: new Map()
   };

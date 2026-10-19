@@ -1,5 +1,5 @@
 /**
- * LabRoute — Admin authentication and the community moments inbox.
+ * LabRoute — Admin authentication and the pending upload review queue.
  *
  * The server issues a signed, HttpOnly admin cookie on successful login. The
  * original browser-only check is kept as a fallback for purely static
@@ -180,7 +180,7 @@ async function guardDashboard() {
     sessionStorage.setItem('isAdmin', 'true');
     if (server.email) sessionStorage.setItem('adminEmail', server.email);
     updateAdminEmailDisplay();
-    loadMomentsInbox();
+    loadPendingUploads();
     return;
   }
 
@@ -198,7 +198,7 @@ async function guardDashboard() {
   }
 
   updateAdminEmailDisplay();
-  loadMomentsInbox();
+  loadPendingUploads();
 }
 
 async function getServerSession() {
@@ -233,14 +233,15 @@ function updateAdminEmailDisplay() {
   if (adminEmail) adminEmailElement.textContent = adminEmail;
 }
 
-// 6. Community moments inbox
-async function loadMomentsInbox() {
-  const container = document.getElementById('momentsInbox');
-  const countElement = document.getElementById('momentsInboxCount');
+// 6. Pending uploads awaiting an admin decision
+async function loadPendingUploads() {
+  const container = document.getElementById('pendingInbox');
+  const countElement = document.getElementById('pendingCount');
+  const statusElement = document.getElementById('pendingStatus');
   if (!container) return;
 
   try {
-    const response = await fetch('/api/admin/moments?limit=8', {
+    const response = await fetch('/api/admin/pending', {
       cache: 'no-store',
       headers: { Accept: 'application/json' }
     });
@@ -254,84 +255,121 @@ async function loadMomentsInbox() {
 
     const contentType = response.headers.get('content-type') || '';
     if (!response.ok || !contentType.includes('application/json')) {
-      throw new Error('The moments service is not available.');
+      throw new Error('The review service is not available.');
     }
 
     const data = await response.json();
-    renderMomentsInbox(container, countElement, data.moments || [], data.total || 0);
+    renderPendingUploads(container, countElement, data.pending || [], data.liveCount || 0);
   } catch (error) {
     if (countElement) countElement.textContent = '—';
+    if (statusElement) statusElement.textContent = '';
     container.innerHTML = `
       <div class="moments-inbox-state is-error">
         <span class="material-symbols-outlined">cloud_off</span>
-        <p>Live moments need the LabRoute upload service. Start it with <code>npm start</code> to see visitor uploads here.</p>
+        <p>Pending uploads need the LabRoute service. Start it with <code>npm start</code>.</p>
       </div>`;
   }
 }
 
-function renderMomentsInbox(container, countElement, moments, total) {
-  if (countElement) countElement.textContent = String(total);
+function renderPendingUploads(container, countElement, pending, liveCount) {
+  if (countElement) countElement.textContent = String(pending.length);
 
-  if (!moments.length) {
+  if (!pending.length) {
     container.innerHTML = `
       <div class="moments-inbox-state">
-        <span class="material-symbols-outlined">photo_camera_back</span>
-        <p>No community uploads yet. The first photo shared from the gallery will appear here.</p>
-        <a href="upload.html" target="_blank" rel="noopener">Open the upload page</a>
+        <span class="material-symbols-outlined">task_alt</span>
+        <p>Nothing to review. ${liveCount} photo${liveCount === 1 ? ' is' : 's are'} live in the gallery.</p>
       </div>`;
     return;
   }
 
-  container.innerHTML = moments
-    .map((moment, index) => {
-      const image = safeImageSource(moment.image);
+  container.innerHTML = pending
+    .map((moment) => {
+      const id = escapeHtml(moment.id);
       const caption = escapeHtml(moment.caption || 'Untitled lab moment');
       const contributor = escapeHtml(moment.contributor || 'Anonymous contributor');
       const date = formatDate(moment.uploadedAt);
-      const notification = moment.notification;
-      const notificationLabel = notificationStatusLabel(notification);
-      const emailLine = moment.uploaderEmail
-        ? `<p class="moments-meta moments-email">${escapeHtml(moment.uploaderEmail)}</p>`
-        : '';
 
       return `
-        <article class="moments-card">
-          <img src="${escapeHtml(image)}" alt="${caption}" loading="lazy" />
+        <article class="moments-card pending-card" data-id="${id}">
+          <img src="/api/admin/pending/${encodeURIComponent(moment.id)}/image" alt="${caption}" loading="lazy" />
           <div class="moments-card-body">
-            <div class="moments-card-top">
-              <span class="moments-position">Image ${index + 1}</span>
-              <span class="moments-notify ${notificationStatusClass(notification)}">${notificationLabel}</span>
-            </div>
+            <span class="pending-flag">Action required</span>
             <h3 class="moments-caption">${caption}</h3>
             <p class="moments-meta">${contributor}${date ? ` · ${date}` : ''}</p>
-            ${emailLine}
+            <div class="pending-actions">
+              <button type="button" class="btn btn-primary btn-sm" data-action="approve" data-id="${id}">
+                <span class="material-symbols-outlined">check</span>
+                <span>Approve</span>
+              </button>
+              <button type="button" class="btn btn-outline btn-sm" data-action="reject" data-id="${id}">
+                <span class="material-symbols-outlined">close</span>
+                <span>Decline</span>
+              </button>
+            </div>
           </div>
         </article>`;
     })
     .join('');
 }
 
-function notificationStatusClass(notification) {
-  if (!notification) return 'unknown';
-  if (notification.status === 'sent') return 'sent';
-  if (notification.status === 'failed') return 'failed';
-  return 'skipped';
+async function reviewPending(id, action, button) {
+  const statusElement = document.getElementById('pendingStatus');
+  const card = button.closest('.pending-card');
+
+  if (!id || !action) return;
+
+  button.disabled = true;
+  const buttons = card ? card.querySelectorAll('button') : [];
+  buttons.forEach((item) => {
+    item.disabled = true;
+  });
+
+  if (statusElement) {
+    statusElement.textContent = action === 'approve' ? 'Approving photo…' : 'Declining photo…';
+  }
+
+  try {
+    const response = await fetch(`/api/admin/pending/${encodeURIComponent(id)}/${action}`, {
+      method: 'POST',
+      headers: { Accept: 'application/json' }
+    });
+
+    if (response.status === 401) {
+      window.location.href = 'login.html';
+      return;
+    }
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(data.message || 'That review action could not be completed.');
+    }
+
+    if (statusElement) {
+      statusElement.textContent =
+        action === 'approve'
+          ? 'Approved. The photo is now image 1 in the gallery.'
+          : 'Declined. The photo was removed.';
+    }
+
+    await loadPendingUploads();
+  } catch (error) {
+    if (statusElement) statusElement.textContent = error.message;
+
+    buttons.forEach((item) => {
+      item.disabled = false;
+    });
+  }
 }
 
-function notificationStatusLabel(notification) {
-  if (!notification) return 'No alert';
-  if (notification.status === 'sent') return 'Email sent';
-  if (notification.status === 'failed') return 'Email failed';
-  if (notification.status === 'skipped') return 'Email logged';
-  return 'No alert';
-}
+document.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-action][data-id]');
+  if (!button) return;
 
-function safeImageSource(value) {
-  const source = String(value || '');
-  if (/^assets\/[A-Za-z0-9/._-]+$/.test(source)) return source;
-  if (/^https:\/\//.test(source)) return source;
-  return 'assets/other_images/labroute_favicon.png';
-}
+  event.preventDefault();
+  reviewPending(button.dataset.id, button.dataset.action, button);
+});
 
 function formatDate(value) {
   if (!value) return '';

@@ -68,36 +68,34 @@
                 </div>
             </section>
 
-            <!-- Community Uploads Inbox -->
-            <section class="admin-section" id="moments">
+            <!-- Pending community uploads -->
+            <section class="admin-section" id="pending">
                 <header class="section-title-row">
                     <div>
                         <h2 class="section-heading">
-                            Community Lab Moments
-                            <span class="section-count" id="momentsInboxCount">—</span>
+                            Pending uploads
+                            <span class="section-count" id="pendingCount">—</span>
                         </h2>
                         <p class="section-subheading">
-                            Visitor uploads. The newest photo is image 1 on the homepage, and every existing
-                            photo moves one place to the right. An email alert is sent to the admin team.
+                            Action required. Approve a photo to place it first in the home page gallery, or
+                            decline it to remove it.
                         </p>
                     </div>
 
                     <div class="moments-head-actions">
-                        <a href="upload.html" class="btn btn-outline btn-sm" target="_blank" rel="noopener">
-                            <span class="material-symbols-outlined">add_a_photo</span>
-                            <span>Open Upload Page</span>
-                        </a>
-                        <a href="index.html#Gallery" class="btn btn-primary btn-sm" target="_blank" rel="noopener">
+                        <a href="index.html#Gallery" class="btn btn-outline btn-sm" target="_blank" rel="noopener">
                             <span class="material-symbols-outlined">photo_library</span>
                             <span>View Gallery</span>
                         </a>
                     </div>
                 </header>
 
-                <div class="moments-inbox" id="momentsInbox">
+                <p class="pending-status" id="pendingStatus" role="status" aria-live="polite"></p>
+
+                <div class="moments-inbox" id="pendingInbox">
                     <div class="moments-inbox-state">
                         <span class="material-symbols-outlined spinning-icon">sync</span>
-                        <p>Loading recent moments…</p>
+                        <p>Loading pending uploads…</p>
                     </div>
                 </div>
             </section>
@@ -164,7 +162,7 @@
      <footer id="site-footer"></footer>
 
     <!-- Protected Authentication Script -->
-    <script src="admin.js"></script>
+    <script src="js/admin.js"></script>
 </body>
 
 </html>
