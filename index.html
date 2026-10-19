@@ -165,7 +165,26 @@
                     </p>
                 </header>
 
-                <div class="gallery-masonry" id="galleryMasonryGrid">
+                <!-- Community upload entry point -->
+                <div class="gallery-upload-banner">
+                    <div class="gallery-upload-copy">
+                        <span class="gallery-upload-icon material-symbols-outlined" aria-hidden="true">add_a_photo</span>
+                        <div>
+                            <h3 class="gallery-upload-title">Share a lab moment</h3>
+                            <p class="gallery-upload-text">
+                                Upload a photo for review. Approved photos appear first in this gallery.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="gallery-upload-actions">
+                        <a href="upload.html" class="btn btn-primary gallery-upload-btn">
+                            <span class="material-symbols-outlined" aria-hidden="true">photo_camera</span>
+                            <span>Upload photo</span>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="gallery-masonry" id="galleryMasonryGrid" aria-live="polite">
                     <!-- Dynamically injected by app.js -->
                 </div>
             </div>

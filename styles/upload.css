@@ -1,0 +1,465 @@
+/* ==========================================================================
+   LAB MOMENT UPLOAD PAGE
+   Minimal single-column form built on the global design tokens.
+   ========================================================================== */
+
+[hidden] {
+  display: none !important;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --------------------------------------------------------------------------
+   1. Page frame
+   -------------------------------------------------------------------------- */
+.upload-main {
+  min-height: 100vh;
+  background: var(--surface);
+}
+
+.upload-shell {
+  width: min(100%, 680px);
+  margin: 0 auto;
+  padding: 9rem 1.5rem 5rem;
+}
+
+.upload-intro {
+  margin-bottom: 1.75rem;
+}
+
+.upload-title {
+  margin: 0.85rem 0 0.5rem;
+  font-family: var(--font-serif);
+  font-size: clamp(1.9rem, 4vw, 2.6rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--primary);
+}
+
+.upload-subtitle {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: var(--text-muted);
+}
+
+.upload-card {
+  padding: 1.5rem;
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+/* --------------------------------------------------------------------------
+   2. Dropzone and preview
+   -------------------------------------------------------------------------- */
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 2.5rem 1.25rem;
+  text-align: center;
+  cursor: pointer;
+  background: var(--surface-tint);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.dropzone.is-dragover {
+  border-color: var(--accent);
+  background: rgba(212, 175, 55, 0.08);
+}
+
+.dropzone.is-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.dropzone-icon {
+  font-size: 34px;
+  color: var(--primary-light);
+}
+
+.dropzone strong {
+  font-size: 0.98rem;
+  color: var(--text-main);
+}
+
+.dropzone-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.photo-preview {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-tint);
+}
+
+.photo-preview img {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  object-fit: cover;
+}
+
+.photo-preview-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0.9rem;
+  border-top: 1px solid var(--border);
+}
+
+.photo-preview-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 0.1rem;
+}
+
+.photo-preview-text strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.82rem;
+}
+
+.photo-preview-text span {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--text-muted);
+}
+
+.photo-remove {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.72rem;
+  color: var(--primary-light);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.photo-remove .material-symbols-outlined {
+  font-size: 16px;
+}
+
+/* --------------------------------------------------------------------------
+   3. Cooldown
+   -------------------------------------------------------------------------- */
+.cooldown-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(212, 175, 55, 0.45);
+  border-radius: var(--radius-sm);
+  background: rgba(212, 175, 55, 0.1);
+}
+
+.cooldown-banner .material-symbols-outlined {
+  font-size: 20px;
+  color: var(--accent);
+}
+
+.cooldown-banner strong {
+  display: block;
+  margin-bottom: 0.1rem;
+  font-size: 0.84rem;
+  color: var(--text-main);
+}
+
+.cooldown-banner p {
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   4. Form
+   -------------------------------------------------------------------------- */
+.moment-form {
+  margin-top: 1.25rem;
+}
+
+.upload-main .form-field {
+  margin-bottom: 1rem;
+}
+
+.upload-main .form-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.required-mark,
+.optional-mark {
+  margin-left: 0.25rem;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.required-mark {
+  color: #a31515;
+}
+
+.optional-mark {
+  color: var(--text-muted);
+}
+
+.upload-main .input-control {
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  font-family: inherit;
+  font-size: 0.875rem;
+  color: var(--text-main);
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.upload-main .input-control:focus {
+  border-color: var(--primary-light);
+  box-shadow: 0 0 0 3px rgba(0, 67, 174, 0.14);
+}
+
+.caption-field {
+  position: relative;
+}
+
+.caption-field textarea {
+  min-height: 88px;
+  padding-bottom: 1.7rem;
+  resize: vertical;
+}
+
+.char-count {
+  position: absolute;
+  right: 0.8rem;
+  bottom: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.63rem;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.char-count.is-near-limit {
+  color: #a15c00;
+  font-weight: 700;
+}
+
+[data-theme="dark"] .char-count.is-near-limit {
+  color: var(--accent);
+}
+
+.consent-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin-top: 0.4rem;
+  padding: 0.85rem 0.9rem;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+  background: var(--surface-tint);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.consent-row input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin-top: 0.1rem;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.consent-row:focus-within {
+  outline: 3px solid rgba(0, 67, 174, 0.2);
+  outline-offset: 2px;
+}
+
+.hp-field {
+  position: absolute !important;
+  left: -9999px !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+}
+
+.form-alert {
+  margin-top: 0.9rem;
+  padding: 0.7rem 0.9rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: #a31515;
+  background: rgba(186, 26, 26, 0.07);
+  border: 1px solid rgba(186, 26, 26, 0.3);
+  border-radius: var(--radius-sm);
+}
+
+[data-theme="dark"] .form-alert {
+  color: #ffb4ab;
+  border-color: rgba(255, 180, 171, 0.3);
+  background: rgba(186, 26, 26, 0.16);
+}
+
+.submit-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.15rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--border);
+}
+
+.submit-note {
+  max-width: 300px;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.upload-submit {
+  flex: 0 0 auto;
+  min-width: 170px;
+}
+
+.upload-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.upload-submit.is-busy .material-symbols-outlined {
+  animation: upload-spin 1s linear infinite;
+}
+
+@keyframes upload-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.dropzone:focus-visible,
+.photo-remove:focus-visible {
+  outline: 3px solid rgba(0, 67, 174, 0.25);
+  outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   5. Success state
+   -------------------------------------------------------------------------- */
+.upload-success {
+  padding: 2.5rem 1.75rem;
+  text-align: center;
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--accent);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.success-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  font-size: 34px;
+  color: var(--accent);
+  background: rgba(212, 175, 55, 0.14);
+  border-radius: 50%;
+}
+
+.success-title {
+  margin: 0.85rem 0 0.4rem;
+  font-family: var(--font-serif);
+  font-size: 1.6rem;
+  color: var(--primary);
+}
+
+.success-subtitle {
+  max-width: 420px;
+  margin: 0 auto;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.success-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1.4rem;
+}
+
+.success-actions .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.success-cooldown {
+  margin-top: 1rem;
+  min-height: 1.1rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   6. Responsive
+   -------------------------------------------------------------------------- */
+@media (max-width: 640px) {
+  .upload-shell {
+    padding: 7rem 1rem 3.5rem;
+  }
+
+  .upload-card {
+    padding: 1.1rem;
+  }
+
+  .submit-row {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .submit-note {
+    max-width: none;
+  }
+
+  .upload-submit {
+    width: 100%;
+  }
+}

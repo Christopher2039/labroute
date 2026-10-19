@@ -5,46 +5,133 @@ document.addEventListener('DOMContentLoaded', () => {
   loadRepositoryData();
 });
 
-// 1. Fetch JSON Content Concurrently
+// 1. Fetch gallery and report content concurrently.
+// The gallery first asks the upload service for the live, ordered list. On a
+// static host (or before the service is running) it falls back to the JSON file.
 async function loadRepositoryData() {
-  try {
-    const [galleryRes, reportsRes] = await Promise.all([
-      fetch('content/gallery.json'),
-      fetch('content/reports/index.json')
-    ]);
+  const [galleryResult, reportsResult] = await Promise.allSettled([
+    loadGalleryData(),
+    loadReportsData()
+  ]);
 
-    if (!galleryRes.ok || !reportsRes.ok) throw new Error('Failed to load JSON data');
-    
-    // `.reverse()` ensures items added to the bottom of your JSON show up first
-    repositoryData.gallery = (await galleryRes.json()).reverse();
-    repositoryData.reports = (await reportsRes.json()).reverse();
+  if (galleryResult.status === 'fulfilled') {
+    repositoryData.gallery = galleryResult.value;
+  } else {
+    console.error('Error fetching gallery data:', galleryResult.reason);
+  }
 
-    // Render only the latest 8 images and latest 6 reports on initial load
-    renderGallery(repositoryData.gallery.slice(0, 8));
+  renderGallery(repositoryData.gallery);
+
+  if (reportsResult.status === 'fulfilled') {
+    repositoryData.reports = reportsResult.value;
+
+    // Render the latest 6 reports on initial load
     renderReports(repositoryData.reports.slice(0, 6));
-    
+
     // Initialize interactions AFTER data is on the page
     initFilterEvents();
-    initGalleryDrag();
-  } catch (error) {
-    console.error('Error fetching repository data:', error);
+  } else {
+    console.error('Error fetching repository data:', reportsResult.reason);
   }
+
+  initGalleryDrag();
+}
+
+async function loadGalleryData() {
+  try {
+    const response = await fetch('/api/gallery', {
+      cache: 'no-store',
+      headers: { Accept: 'application/json' }
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (Array.isArray(data.gallery)) return data.gallery;
+    }
+  } catch (error) {
+    // The upload service is optional on a static deployment; use the file.
+  }
+
+  const fallback = await fetch(`content/gallery.json?v=${Date.now()}`, {
+    cache: 'no-store'
+  });
+
+  if (!fallback.ok) throw new Error(`Gallery request failed with ${fallback.status}`);
+
+  const data = await fallback.json();
+  return Array.isArray(data) ? data : data.gallery || [];
+}
+
+async function loadReportsData() {
+  const response = await fetch('content/reports/index.json');
+
+  if (!response.ok) throw new Error(`Reports request failed with ${response.status}`);
+
+  // `.reverse()` ensures items added to the bottom of the JSON show up first
+  return (await response.json()).reverse();
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (character) => {
+    switch (character) {
+      case '&':
+        return '&amp;';
+      case '<':
+        return '&lt;';
+      case '>':
+        return '&gt;';
+      case '"':
+        return '&quot;';
+      case "'":
+        return '&#39;';
+      default:
+        return character;
+    }
+  });
+}
+
+function safeImageSource(value) {
+  const source = String(value ?? '');
+  if (/^assets\/[A-Za-z0-9/._-]+$/.test(source)) return source;
+  if (/^https:\/\//.test(source)) return source;
+  return '';
 }
 
 // 2. Render Gallery HTML (Masonry Layout)
 function renderGallery(items) {
   const container = document.getElementById('galleryMasonryGrid');
-  if (!container || !items) return;
+  if (!container) return;
+
+  const validItems = Array.isArray(items)
+    ? items.filter((item) => item && safeImageSource(item.image))
+    : [];
+
+  if (!validItems.length) {
+    container.innerHTML = `
+      <p class="gallery-empty">
+        The gallery is being prepared. <a href="upload.html">Share the first moment</a>.
+      </p>`;
+    return;
+  }
 
   // We assign a pseudo-random shape to each image to force the scattered layout
-  const shapes = ['tall', 'standard', 'square', 'tall']; 
+  const shapes = ['tall', 'standard', 'square', 'tall'];
 
-  container.innerHTML = items
+  container.innerHTML = validItems
     .map((item, index) => {
       const shapeClass = shapes[index % shapes.length];
+      const caption = item.caption || item.title || 'A moment from the LabRoute archive';
+      const image = safeImageSource(item.image);
+      const contributor = String(item.contributor || '').trim();
+
       return `
       <figure class="gallery-card ${shapeClass}">
-        <img src="${item.image}" alt="${item.title}" class="gallery-image" loading="lazy" />
+        ${index === 0 && item.uploaded ? '<span class="gallery-new-badge">New</span>' : ''}
+        <img src="${escapeHtml(image)}" alt="${escapeHtml(caption)}" class="gallery-image" loading="lazy" />
+        <figcaption class="gallery-caption">
+          <h4>${escapeHtml(caption)}</h4>
+          ${contributor ? `<p>${escapeHtml(contributor)}</p>` : ''}
+        </figcaption>
       </figure>`;
     })
     .join('');

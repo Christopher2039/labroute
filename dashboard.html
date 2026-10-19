@@ -68,6 +68,38 @@
                 </div>
             </section>
 
+            <!-- Pending community uploads -->
+            <section class="admin-section" id="pending">
+                <header class="section-title-row">
+                    <div>
+                        <h2 class="section-heading">
+                            Pending uploads
+                            <span class="section-count" id="pendingCount">—</span>
+                        </h2>
+                        <p class="section-subheading">
+                            Action required. Approve a photo to place it first in the home page gallery, or
+                            decline it to remove it.
+                        </p>
+                    </div>
+
+                    <div class="moments-head-actions">
+                        <a href="index.html#Gallery" class="btn btn-outline btn-sm" target="_blank" rel="noopener">
+                            <span class="material-symbols-outlined">photo_library</span>
+                            <span>View Gallery</span>
+                        </a>
+                    </div>
+                </header>
+
+                <p class="pending-status" id="pendingStatus" role="status" aria-live="polite"></p>
+
+                <div class="moments-inbox" id="pendingInbox">
+                    <div class="moments-inbox-state">
+                        <span class="material-symbols-outlined spinning-icon">sync</span>
+                        <p>Loading pending uploads…</p>
+                    </div>
+                </div>
+            </section>
+
             <!-- Department Directory Overview -->
             <section class="admin-section">
                 <header class="section-title-row">
@@ -130,7 +162,7 @@
      <footer id="site-footer"></footer>
 
     <!-- Protected Authentication Script -->
-    <script src="admin.js"></script>
+    <script src="js/admin.js"></script>
 </body>
 
 </html>

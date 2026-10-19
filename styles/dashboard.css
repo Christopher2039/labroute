@@ -224,6 +224,168 @@
   margin: 0;
 }
 
+/* --------------------------------------------------------------------------
+   5. Community Moments Inbox
+   -------------------------------------------------------------------------- */
+.section-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  padding: 0.15rem 0.5rem;
+  margin-left: 0.4rem;
+  border-radius: var(--radius-pill);
+  background: var(--surface-tint);
+  border: 1px solid var(--border);
+  color: var(--primary-light);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.moments-head-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pending-status {
+  margin: 0 0 1rem;
+  min-height: 1.2rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.moments-inbox {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1.25rem;
+}
+
+.moments-inbox-state {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  background: var(--surface-card);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+}
+
+.moments-inbox-state .material-symbols-outlined {
+  font-size: 26px;
+  color: var(--primary-light);
+}
+
+.moments-inbox-state a {
+  color: var(--primary-light);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.moments-inbox-state.is-error .material-symbols-outlined {
+  color: var(--accent);
+}
+
+.spinning-icon {
+  animation: moments-spin 1.2s linear infinite;
+}
+
+@keyframes moments-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.moments-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.moments-card img {
+  display: block;
+  width: 100%;
+  height: 190px;
+  object-fit: contain;
+  background: var(--surface-tint);
+}
+
+.moments-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.95rem 1rem 1.1rem;
+}
+
+.pending-flag {
+  align-self: flex-start;
+  padding: 0.12rem 0.45rem;
+  border-radius: var(--radius-pill);
+  background: rgba(212, 175, 55, 0.16);
+  border: 1px solid rgba(212, 175, 55, 0.5);
+  color: #7a5c00;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+[data-theme="dark"] .pending-flag {
+  color: var(--accent);
+}
+
+.moments-caption {
+  margin: 0.1rem 0 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--text-main);
+}
+
+.moments-meta {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.pending-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+}
+
+.pending-actions .btn {
+  flex: 1;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.78rem;
+}
+
+.pending-actions .material-symbols-outlined {
+  font-size: 17px;
+}
+
+.pending-actions .btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
 /* ==========================================================================
    RESPONSIVE ADJUSTMENTS
    ========================================================================== */

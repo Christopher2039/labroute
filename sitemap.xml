@@ -25,4 +25,12 @@
     <priority>1.0</priority>
   </url>
 
+  <!-- Community upload page -->
+  <url>
+    <loc>https://labroute.vercel.app/upload.html</loc>
+    <lastmod>2026-10-19</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
 </urlset>
