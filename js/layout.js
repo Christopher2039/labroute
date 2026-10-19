@@ -25,7 +25,7 @@ const Layout = {
     return `
       <div class="container header-container">
         <a href="index.html" class="brand-logo" aria-label="LabRoute Home">
-          <span class="material-symbols-outlined">experiment</span>
+          <svg class="brand-icon" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6m-5 0v6l-6 10a1.3 1.3 0 0 0 1 2h14a1.3 1.3 0 0 0 1-2L14 9V3M7 15h10"/></svg>
           <span>LabRoute</span>
         </a>
 
@@ -44,20 +44,27 @@ const Layout = {
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
             </button>
-            <input type="search" class="input-search-nav" placeholder="Search resources..." id="navSearch" autocomplete="off" />
+            <input type="search" class="input-search-nav" placeholder="Search resources..." id="navSearch" aria-label="Search resources" autocomplete="off" />
           </form>
 
-          <button class="icon-btn" id="themeToggleBtn" aria-label="Toggle light/dark theme"     title="Toggle theme">
-            <span class="material-symbols-outlined" id="themeIcon">dark_mode</span>
+          <button class="icon-btn" id="themeToggleBtn" aria-label="Toggle light/dark theme" title="Toggle theme" aria-pressed="false">
+            <span id="themeIcon" aria-hidden="true">${this.themeIcon(false)}</span>
           </button>
 
-          <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle navigation menu">
-            <span class="material-symbols-outlined">menu</span>
-          </button>
+          <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle navigation menu" aria-controls="navMenu" aria-expanded="false">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
           </button>
         </div>
       </div>
     `;
+  },
+
+  // Inline icons remain legible even if the web font cannot load.
+  themeIcon(isDark) {
+    const shape = isDark
+      ? '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>'
+      : '<path d="M20.5 13a8.5 8.5 0 0 1-9.5-9.5A8.5 8.5 0 1 0 20.5 13Z"/>';
+    return `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${shape}</svg>`;
   },
 
   // 2. Footer Template
@@ -153,7 +160,8 @@ const Layout = {
     const currentTheme = localStorage.getItem('myela_theme') || 'light';
     if (currentTheme === 'dark') {
       document.documentElement.setAttribute('data-theme', 'dark');
-      if (themeIcon) themeIcon.textContent = 'light_mode';
+      if (themeIcon) themeIcon.innerHTML = this.themeIcon(true);
+      themeToggleBtn?.setAttribute('aria-pressed', 'true');
     }
 
     // 2. Toggle on click
@@ -164,9 +172,10 @@ const Layout = {
 
         document.documentElement.setAttribute('data-theme', newTheme);
         localStorage.setItem('myela_theme', newTheme);
+        themeToggleBtn.setAttribute('aria-pressed', String(newTheme === 'dark'));
 
         if (themeIcon) {
-          themeIcon.textContent = newTheme === 'dark' ? 'light_mode' : 'dark_mode';
+          themeIcon.innerHTML = this.themeIcon(newTheme === 'dark');
         }
       });
     }
@@ -176,9 +185,19 @@ const Layout = {
     const navMenu = document.getElementById('navMenu');
     if (mobileToggle && navMenu) {
       mobileToggle.addEventListener('click', () => {
-        navMenu.classList.toggle('open');
+        const isOpen = navMenu.classList.toggle('open');
+        mobileToggle.setAttribute('aria-expanded', String(isOpen));
       });
     }
+
+    // Let keyboard users dismiss the mobile menu without losing their place.
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && navMenu?.classList.contains('open')) {
+        navMenu.classList.remove('open');
+        mobileToggle.setAttribute('aria-expanded', 'false');
+        mobileToggle.focus();
+      }
+    });
 
     // Scroll Glassmorphism Effect
     const siteHeader = document.getElementById('site-header');
