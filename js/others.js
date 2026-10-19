@@ -35,35 +35,43 @@ function renderProducts(products, container) {
 
   container.innerHTML = products.map(item => `
     <article class="product-card">
-      <div>
-        <div class="product-top-row">
-          <div class="product-icon-box">
-            <span class="material-symbols-outlined">${item.icon || 'deployed_code'}</span>
-          </div>
-          <span class="product-status-pill">${item.status || 'Active'}</span>
-        </div>
-
-        <div class="product-body">
-          <h2 class="product-name">${item.name}</h2>
-          <p class="product-tagline">${item.tagline}</p>
-          <p class="product-desc">${item.description}</p>
-          
-          <div class="product-tags-row">
-            ${(item.tags || []).map(tag => `<span class="product-tag-chip">${tag}</span>`).join('')}
-          </div>
-
-          <div class="product-dev-credit">
-            <span class="material-symbols-outlined" style="font-size: 16px;">code</span>
-            <span>Developed by <strong>${item.developer}</strong></span>
-          </div>
-        </div>
+      <!-- Left Side: Product Screenshot / Preview Image -->
+      <div class="product-image-container">
+        <img src="${item.imageUrl || 'assets/images/default-preview.png'}" alt="${item.name} Preview" />
       </div>
 
-      <div class="product-footer">
-        <a href="${item.link}" target="_blank" rel="noopener noreferrer" class="btn btn-gold btn-product-launch">
-          <span>Open Application</span>
-          <span class="material-symbols-outlined">launch</span>
-        </a>
+      <!-- Right Side: Content & Actions -->
+      <div class="product-content-wrapper">
+        <div>
+          <div class="product-top-row">
+            <div class="product-icon-box">
+              <span class="material-symbols-outlined">${item.icon || 'deployed_code'}</span>
+            </div>
+            <span class="product-status-pill">${item.status || 'Active'}</span>
+          </div>
+
+          <div class="product-body">
+            <h2 class="product-name">${item.name}</h2>
+            <p class="product-tagline">${item.tagline}</p>
+            <p class="product-desc">${item.description}</p>
+            
+            <div class="product-tags-row">
+              ${(item.tags || []).map(tag => `<span class="product-tag-chip">#${tag}</span>`).join('')}
+            </div>
+
+            <div class="product-dev-credit">
+              <span class="material-symbols-outlined" style="font-size: 16px;">code</span>
+              <span>Developed by <strong>${item.developer}</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="product-footer">
+          <a href="${item.link}" target="_blank" rel="noopener noreferrer" class="btn btn-gold btn-product-launch">
+            <span>Open Application</span>
+            <span class="material-symbols-outlined">launch</span>
+          </a>
+        </div>
       </div>
     </article>
   `).join('');
