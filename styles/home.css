@@ -375,6 +375,135 @@
   color: var(--text-inverse-muted);
 }
 
+/* Community upload entry point inside the gallery */
+.gallery-upload-banner {
+  max-width: 1000px;
+  margin: 0 auto 2.5rem;
+  padding: 1.5rem 1.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  background: linear-gradient(135deg, #001849 0%, #002147 58%, #00346b 100%);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  color: var(--text-inverse);
+  position: relative;
+  overflow: hidden;
+}
+
+.gallery-upload-banner::after {
+  content: "";
+  position: absolute;
+  width: 220px;
+  height: 220px;
+  right: -70px;
+  top: -120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(212, 175, 55, 0.22) 0%, rgba(212, 175, 55, 0) 70%);
+  pointer-events: none;
+}
+
+.gallery-upload-copy {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.gallery-upload-icon {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  background: rgba(212, 175, 55, 0.14);
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  color: var(--accent);
+  font-size: 24px;
+}
+
+.gallery-upload-title {
+  font-family: var(--font-serif);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 0.3rem;
+}
+
+.gallery-upload-text {
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.76);
+  max-width: 560px;
+}
+
+.gallery-upload-actions {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.6rem;
+  position: relative;
+  z-index: 1;
+}
+
+.gallery-upload-btn {
+  white-space: nowrap;
+}
+
+.gallery-upload-btn .material-symbols-outlined {
+  font-size: 19px;
+}
+
+.gallery-upload-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.66);
+  text-align: right;
+}
+
+.gallery-upload-note .material-symbols-outlined {
+  font-size: 15px;
+  color: var(--accent);
+}
+
+.gallery-new-badge {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 2;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
+}
+
+.gallery-loading,
+.gallery-empty {
+  column-span: all;
+  width: 100%;
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.938rem;
+}
+
 /* 5. Donate Section */
 .donate-section {
   padding: 6rem 0;
@@ -531,6 +660,35 @@
 
   .gallery-section {
     padding: 4rem 0 5rem;
+  }
+
+  .gallery-upload-banner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1.25rem;
+    padding: 1.25rem;
+    margin-bottom: 1.75rem;
+  }
+
+  .gallery-upload-title {
+    font-size: 1.1rem;
+  }
+
+  .gallery-upload-text {
+    font-size: 0.85rem;
+  }
+
+  .gallery-upload-actions {
+    align-items: stretch;
+  }
+
+  .gallery-upload-btn {
+    width: 100%;
+  }
+
+  .gallery-upload-note {
+    justify-content: center;
+    text-align: center;
   }
 
   .gallery-masonry {

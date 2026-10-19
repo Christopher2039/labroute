@@ -1,0 +1,739 @@
+'use strict';
+
+const fs = require('fs');
+const fsp = fs.promises;
+const http = require('http');
+const path = require('path');
+
+const adminAuth = require('./lib/admin-auth');
+const { loadConfig } = require('./lib/config');
+const { loadEnvFile } = require('./lib/env');
+const { loadAdminEmails, logNotification, notifyMomentUpload, readNotificationLog, resolveProvider } = require('./lib/email');
+const { GalleryStore } = require('./lib/gallery-store');
+const { MomentsService } = require('./lib/moments-service');
+const { RateLimitStore } = require('./lib/rate-limit');
+const {
+  HttpError,
+  getClientIp,
+  hmac,
+  isSecureRequest,
+  parseCookies,
+  randomToken,
+  requestOrigin,
+  safeEqual,
+  serializeCookie,
+  toPositiveInt
+} = require('./lib/util');
+
+const MIME_TYPES = {
+  '.html': 'text/html',
+  '.css': 'text/css',
+  '.js': 'application/javascript',
+  '.mjs': 'application/javascript',
+  '.json': 'application/json',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.otf': 'font/otf',
+  '.txt': 'text/plain',
+  '.xml': 'application/xml',
+  '.pdf': 'application/pdf',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+  '.map': 'application/json'
+};
+
+const CHARSET_EXTENSIONS = new Set(['.html', '.css', '.js', '.mjs', '.json', '.svg', '.txt', '.xml', '.map']);
+const BLOCKED_STATIC_ROOTS = new Set([
+  '.git',
+  '.env',
+  'lib',
+  'node_modules',
+  'package-lock.json',
+  'package.json',
+  'server.js',
+  'tests'
+]);
+
+const apiNoStore = { 'Cache-Control': 'no-store' };
+
+function sendJson(res, status, payload, headers = {}) {
+  if (res.headersSent) {
+    res.end();
+    return;
+  }
+
+  const body = Buffer.from(JSON.stringify(payload));
+  res.writeHead(status, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Content-Length': body.length,
+    ...apiNoStore,
+    ...headers
+  });
+  res.end(body);
+}
+
+function sendMethodNotAllowed(res, allowed) {
+  sendJson(
+    res,
+    405,
+    {
+      ok: false,
+      error: 'method_not_allowed',
+      message: 'This request method is not supported for that endpoint.'
+    },
+    { Allow: allowed.join(', ') }
+  );
+}
+
+function sendError(res, error) {
+  if (res.headersSent) {
+    res.destroy();
+    return;
+  }
+
+  if (error instanceof HttpError) {
+    const headers = { ...apiNoStore };
+    if (error.status === 429 && error.extra?.retryAfterSeconds) {
+      headers['Retry-After'] = String(error.extra.retryAfterSeconds);
+    }
+
+    sendJson(
+      res,
+      error.status,
+      {
+        ok: false,
+        error: error.code,
+        message: error.message,
+        ...error.extra
+      },
+      headers
+    );
+    return;
+  }
+
+  console.error('[labroute] Unhandled request error:', error);
+  sendJson(res, 500, {
+    ok: false,
+    error: 'server_error',
+    message: 'Something went wrong while handling that request. Please try again.'
+  });
+}
+
+function readBody(req, limit) {
+  return new Promise((resolve, reject) => {
+    const declaredLength = Number(req.headers['content-length'] || 0);
+
+    if (Number.isFinite(declaredLength) && declaredLength > limit) {
+      req.resume();
+      reject(
+        new HttpError(
+          413,
+          'payload_too_large',
+          'That upload is too large. Please choose a smaller photo.'
+        )
+      );
+      return;
+    }
+
+    let total = 0;
+    let settled = false;
+    const chunks = [];
+
+    function finish(callback, value) {
+      if (settled) return;
+      settled = true;
+      callback(value);
+    }
+
+    req.on('data', (chunk) => {
+      total += chunk.length;
+
+      if (total > limit) {
+        chunks.length = 0;
+        req.removeAllListeners('data');
+        req.removeAllListeners('end');
+        req.removeAllListeners('error');
+        req.on('error', () => {});
+        req.resume();
+        finish(
+          reject,
+          new HttpError(
+            413,
+            'payload_too_large',
+            'That upload is too large. Please choose a smaller photo.'
+          )
+        );
+        return;
+      }
+
+      chunks.push(chunk);
+    });
+
+    req.on('end', () => finish(resolve, Buffer.concat(chunks)));
+    req.on('error', (error) => finish(reject, error));
+  });
+}
+
+async function readJsonBody(req, limit) {
+  const raw = await readBody(req, limit);
+
+  if (!raw.length) {
+    throw new HttpError(400, 'empty_body', 'The request body was empty.');
+  }
+
+  const contentType = String(req.headers['content-type'] || '')
+    .split(';')[0]
+    .trim()
+    .toLowerCase();
+
+  if (contentType !== 'application/json') {
+    throw new HttpError(415, 'unsupported_content_type', 'Expected an application/json request.');
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw.toString('utf8'));
+  } catch {
+    throw new HttpError(400, 'invalid_json', 'The request body was not valid JSON.');
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new HttpError(400, 'invalid_json', 'The request body must be a JSON object.');
+  }
+
+  return parsed;
+}
+
+function getVisitorIdentity(req, config) {
+  const cookies = parseCookies(req.headers.cookie);
+  const rawCookie = cookies[config.visitorCookieName] || '';
+
+  let visitorId = null;
+  const separator = rawCookie.lastIndexOf('.');
+  if (separator > 0) {
+    const candidate = rawCookie.slice(0, separator);
+    const signature = rawCookie.slice(separator + 1);
+    const expected = hmac(`visitor|${candidate}`, config.secret).slice(0, 32);
+
+    if (/^[A-Za-z0-9_-]{8,64}$/.test(candidate) && safeEqual(signature, expected)) {
+      visitorId = candidate;
+    }
+  }
+
+  const isNewVisitor = !visitorId;
+  if (!visitorId) visitorId = randomToken(18);
+
+  const rawDevice = String(req.headers['x-labroute-device'] || '');
+  const deviceId = /^[A-Za-z0-9_-]{8,128}$/.test(rawDevice) ? rawDevice : '';
+
+  const ip = getClientIp(req, config.trustProxy);
+  const userAgent = `${String(req.headers['user-agent'] || '').slice(0, 300)}|${String(
+    req.headers['accept-language'] || ''
+  ).slice(0, 80)}`;
+
+  return { visitorId, isNewVisitor, deviceId, ip, userAgent };
+}
+
+function visitorCookie(config, identity, req) {
+  const value = `${identity.visitorId}.${hmac(
+    `visitor|${identity.visitorId}`,
+    config.secret
+  ).slice(0, 32)}`;
+
+  return serializeCookie(config.visitorCookieName, value, {
+    maxAge: config.visitorCookieMaxAge,
+    secure: isSecureRequest(req),
+    httpOnly: true,
+    sameSite: 'Lax'
+  });
+}
+
+function adminSession(req, config) {
+  const cookies = parseCookies(req.headers.cookie);
+  return adminAuth.verifyToken(config, cookies[config.adminCookieName]);
+}
+
+function requireAdmin(req, config) {
+  const session = adminSession(req, config);
+  if (!session) {
+    throw new HttpError(401, 'admin_auth_required', 'Please sign in to the admin dashboard again.');
+  }
+  return session;
+}
+
+function loginAttemptCheck(attempts, key, now) {
+  if (attempts.size > 2000) {
+    for (const [attemptKey, value] of attempts) {
+      if (value.resetAt <= now) attempts.delete(attemptKey);
+    }
+  }
+
+  const existing = attempts.get(key);
+
+  if (!existing || existing.resetAt <= now) {
+    attempts.set(key, { count: 1, resetAt: now + 15 * 60 * 1000 });
+    return { allowed: true };
+  }
+
+  existing.count += 1;
+  if (existing.count > 10) {
+    return {
+      allowed: false,
+      retryAfterSeconds: Math.max(1, Math.ceil((existing.resetAt - now) / 1000))
+    };
+  }
+
+  return { allowed: true };
+}
+
+async function handleAdminApi(req, res, pathname, url, ctx) {
+  const { config, galleryStore } = ctx;
+  const method = req.method || 'GET';
+
+  if (pathname === '/api/admin/login') {
+    if (method !== 'POST') return sendMethodNotAllowed(res, ['POST']);
+
+    const body = await readJsonBody(req, 32 * 1024);
+    const email = String(body.email || '').trim().toLowerCase();
+    const password = String(body.password || '');
+
+    if (!email || !password) {
+      throw new HttpError(400, 'credentials_required', 'Enter your admin email and password.');
+    }
+
+    const ip = getClientIp(req, config.trustProxy);
+    const attempt = loginAttemptCheck(ctx.loginAttempts, `${ip}|${email}`, Date.now());
+
+    if (!attempt.allowed) {
+      throw new HttpError(
+        429,
+        'login_rate_limited',
+        'Too many sign-in attempts. Please wait a few minutes and try again.',
+        { retryAfterSeconds: attempt.retryAfterSeconds }
+      );
+    }
+
+    const admin = await adminAuth.verifyCredentials(config, email, password);
+    if (!admin) {
+      throw new HttpError(401, 'invalid_credentials', 'Incorrect institutional email or security key.');
+    }
+
+    ctx.loginAttempts.delete(`${ip}|${email}`);
+    const token = adminAuth.createToken(config, admin.email);
+
+    res.setHeader(
+      'Set-Cookie',
+      serializeCookie(config.adminCookieName, token, {
+        maxAge: Math.floor(config.adminSessionTtlMs / 1000),
+        secure: isSecureRequest(req),
+        httpOnly: true,
+        sameSite: 'Lax'
+      })
+    );
+
+    return sendJson(res, 200, { ok: true, email: admin.email });
+  }
+
+  if (pathname === '/api/admin/logout') {
+    if (method !== 'POST') return sendMethodNotAllowed(res, ['POST']);
+
+    res.setHeader(
+      'Set-Cookie',
+      serializeCookie(config.adminCookieName, '', {
+        maxAge: 0,
+        secure: isSecureRequest(req),
+        httpOnly: true,
+        sameSite: 'Lax'
+      })
+    );
+
+    return sendJson(res, 200, { ok: true });
+  }
+
+  if (pathname === '/api/admin/session') {
+    if (method !== 'GET') return sendMethodNotAllowed(res, ['GET']);
+
+    const session = adminSession(req, config);
+    return sendJson(res, 200, {
+      ok: true,
+      authenticated: Boolean(session),
+      email: session?.email || null
+    });
+  }
+
+  if (pathname === '/api/admin/moments') {
+    if (method !== 'GET') return sendMethodNotAllowed(res, ['GET']);
+
+    const session = requireAdmin(req, config);
+    const limit = Math.min(60, toPositiveInt(url.searchParams.get('limit'), 12));
+    const publicGallery = await galleryStore.publicGallery();
+    const uploads = publicGallery.filter((item) => item.uploaded);
+    const recent = uploads.slice(0, limit);
+    const notifications = await readNotificationLog(config, 400);
+    const latestByMoment = new Map();
+
+    // Entries are oldest first, so the last one wins for each moment.
+    for (const entry of notifications) {
+      if (entry?.momentId) latestByMoment.set(entry.momentId, entry);
+    }
+
+    return sendJson(res, 200, {
+      ok: true,
+      admin: session.email,
+      total: uploads.length,
+      count: recent.length,
+      moments: recent.map((moment) => {
+        const notification = latestByMoment.get(moment.id);
+        return {
+          ...moment,
+          uploaderEmail: notification?.uploaderEmail || '',
+          notification: notification
+            ? {
+                provider: notification.provider || 'none',
+                status: notification.status || 'unknown',
+                error: notification.error || null,
+                at: notification.at || null
+              }
+            : null
+        };
+      })
+    });
+  }
+
+  return sendJson(res, 404, {
+    ok: false,
+    error: 'not_found',
+    message: 'Unknown admin endpoint.'
+  });
+}
+
+async function handleApi(req, res, pathname, url, ctx) {
+  const { config, galleryStore, moments } = ctx;
+  const method = req.method || 'GET';
+
+  if (pathname === '/api/health') {
+    if (method !== 'GET') return sendMethodNotAllowed(res, ['GET']);
+
+    return sendJson(res, 200, {
+      ok: true,
+      service: 'labroute-moments',
+      cooldownMinutes: config.cooldownMinutes,
+      maxUploadBytes: config.maxUploadBytes,
+      emailProvider: resolveProvider(config) || 'none',
+      storage: 'local'
+    });
+  }
+
+  if (pathname === '/api/gallery') {
+    if (method !== 'GET') return sendMethodNotAllowed(res, ['GET']);
+
+    const gallery = await galleryStore.publicGallery();
+    return sendJson(res, 200, { ok: true, gallery, count: gallery.length });
+  }
+
+  if (pathname === '/api/moments/status') {
+    if (method !== 'GET') return sendMethodNotAllowed(res, ['GET']);
+
+    const identity = getVisitorIdentity(req, config);
+    if (identity.isNewVisitor) {
+      res.setHeader('Set-Cookie', visitorCookie(config, identity, req));
+    }
+
+    const status = await moments.getStatus(identity);
+    return sendJson(res, 200, { ok: true, ...status });
+  }
+
+  if (pathname === '/api/moments/recent') {
+    if (method !== 'GET') return sendMethodNotAllowed(res, ['GET']);
+
+    const limit = Math.min(24, toPositiveInt(url.searchParams.get('limit'), 8));
+    const recent = await galleryStore.recentMoments(limit);
+    return sendJson(res, 200, { ok: true, moments: recent, count: recent.length });
+  }
+
+  if (pathname === '/api/moments') {
+    if (method !== 'POST') return sendMethodNotAllowed(res, ['POST']);
+
+    const identity = getVisitorIdentity(req, config);
+    if (identity.isNewVisitor) {
+      res.setHeader('Set-Cookie', visitorCookie(config, identity, req));
+    }
+
+    const body = await readJsonBody(req, config.maxJsonBytes);
+    const result = await moments.createMoment(body, identity);
+    const origin = requestOrigin(req, config.publicBaseUrl);
+    const links = {
+      imageUrl: `${origin}/${result.moment.image}`,
+      galleryUrl: `${origin}/index.html#Gallery`,
+      dashboardUrl: `${origin}/dashboard.html#moments`
+    };
+
+    const notification = await notifyMomentUpload({
+      config,
+      moment: result.moment,
+      uploader: result.uploader,
+      links
+    });
+
+    await logNotification(config, {
+      momentId: result.moment.id,
+      caption: result.moment.caption,
+      contributor: result.moment.contributor || 'Anonymous contributor',
+      uploaderEmail: result.uploader.email || '',
+      provider: notification.provider,
+      status: notification.status,
+      error: notification.error || null,
+      recipients: notification.recipients,
+      reason: notification.reason || null
+    });
+
+    return sendJson(res, 201, {
+      ok: true,
+      message:
+        'Your moment is now image 1 in the LabRoute gallery. Every existing photo moved one place to the right.',
+      moment: result.moment,
+      image: result.image,
+      gallery: result.gallery,
+      galleryCount: result.gallery.length,
+      notification: {
+        provider: notification.provider,
+        status: notification.status
+      },
+      ...result.cooldown
+    });
+  }
+
+  if (pathname === '/api/admin' || pathname.startsWith('/api/admin/')) {
+    return handleAdminApi(req, res, pathname, url, ctx);
+  }
+
+  return sendJson(res, 404, {
+    ok: false,
+    error: 'not_found',
+    message: 'Unknown API endpoint.'
+  });
+}
+
+function cacheControlFor(file, isUpload) {
+  if (isUpload) return 'public, max-age=31536000, immutable';
+
+  const extension = path.extname(file).toLowerCase();
+  if (['.html', '.json', '.js', '.mjs', '.css'].includes(extension)) return 'no-cache';
+  if (['.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg', '.ico', '.woff', '.woff2'].includes(extension)) {
+    return 'public, max-age=86400';
+  }
+  return 'no-cache';
+}
+
+function resolveStaticFile(pathname, config) {
+  if (pathname === '/') {
+    return { file: path.join(config.rootDir, 'index.html'), isUpload: false };
+  }
+
+  const uploadPrefix = `${config.publicUploadPrefix}/`;
+  if (pathname.startsWith(uploadPrefix)) {
+    const name = pathname.slice(uploadPrefix.length);
+    if (!name || name !== path.basename(name) || !/^[A-Za-z0-9._-]+$/.test(name)) return null;
+
+    return { file: path.join(config.uploadDir, name), isUpload: true };
+  }
+
+  const withoutLeadingSlash = pathname.replace(/^\/+/, '');
+  if (!withoutLeadingSlash || withoutLeadingSlash.includes('\\') || withoutLeadingSlash.includes('\0')) {
+    return null;
+  }
+
+  const normalized = path.posix.normalize(withoutLeadingSlash);
+  if (normalized.startsWith('..') || path.posix.isAbsolute(normalized)) return null;
+
+  const segments = normalized.split('/');
+  if (BLOCKED_STATIC_ROOTS.has(segments[0]) || BLOCKED_STATIC_ROOTS.has(normalized)) return null;
+  if (normalized === 'data/runtime' || normalized.startsWith('data/runtime/')) return null;
+  if (normalized === 'data/private' || normalized.startsWith('data/private/')) return null;
+
+  const root = path.resolve(config.rootDir);
+  const file = path.resolve(root, normalized);
+  if (file !== root && !file.startsWith(root + path.sep)) return null;
+
+  return { file, isUpload: false };
+}
+
+async function serveStatic(req, res, pathname, ctx) {
+  const { config } = ctx;
+
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    return sendMethodNotAllowed(res, ['GET', 'HEAD']);
+  }
+
+  const resolved = resolveStaticFile(pathname, config);
+  if (!resolved) return sendNotFound(req, res);
+
+  let { file } = resolved;
+  let stat;
+
+  try {
+    stat = await fsp.stat(file);
+  } catch {
+    stat = null;
+  }
+
+  // Friendly extensionless routes such as /upload or /about.
+  if ((!stat || stat.isDirectory()) && !path.extname(file) && !resolved.isUpload) {
+    const htmlCandidate = `${file}.html`;
+    try {
+      const htmlStat = await fsp.stat(htmlCandidate);
+      if (htmlStat.isFile()) {
+        file = htmlCandidate;
+        stat = htmlStat;
+      }
+    } catch {
+      // Keep the original 404.
+    }
+  }
+
+  if (!stat || !stat.isFile()) return sendNotFound(req, res);
+
+  const extension = path.extname(file).toLowerCase();
+  let contentType = MIME_TYPES[extension] || 'application/octet-stream';
+  if (CHARSET_EXTENSIONS.has(extension)) contentType += '; charset=utf-8';
+
+  res.writeHead(200, {
+    'Content-Type': contentType,
+    'Content-Length': stat.size,
+    'Cache-Control': cacheControlFor(file, resolved.isUpload),
+    'Last-Modified': stat.mtime.toUTCString()
+  });
+
+  if (req.method === 'HEAD') {
+    res.end();
+    return;
+  }
+
+  const stream = fs.createReadStream(file);
+  stream.on('error', (error) => {
+    console.error(`[labroute] Could not stream ${file}:`, error.message);
+    res.destroy();
+  });
+  stream.pipe(res);
+}
+
+function sendNotFound(req, res) {
+  if (res.headersSent) {
+    res.end();
+    return;
+  }
+
+  const acceptsHtml = String(req.headers.accept || '').includes('text/html');
+  const body = acceptsHtml
+    ? `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Page not found — LabRoute</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#faf8ff;color:#1a1b22;font-family:system-ui,sans-serif}main{text-align:center;padding:2rem}h1{font-family:Georgia,serif;color:#002147;font-size:2.5rem;margin:0 0 .75rem}p{color:#535665;margin:0 0 1.5rem}a{display:inline-block;background:#002147;color:#fff;text-decoration:none;padding:.75rem 1.4rem;border-radius:999px;font-weight:600}</style></head><body><main><p style="letter-spacing:.12em;font-size:.75rem;color:#0043ae">LABROUTE · 404</p><h1>This page is not on the bench.</h1><p>The link may be old, or the page may have moved.</p><a href="/index.html">Return to the archive</a></main></body></html>`
+    : 'Not found';
+
+  res.writeHead(404, {
+    'Content-Type': acceptsHtml ? 'text/html; charset=utf-8' : 'text/plain; charset=utf-8',
+    'Content-Length': Buffer.byteLength(body),
+    'Cache-Control': 'no-store'
+  });
+  res.end(body);
+}
+
+async function handleRequest(req, res, ctx) {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+
+  let url;
+  try {
+    url = new URL(req.url || '/', 'http://localhost');
+  } catch {
+    return sendJson(res, 400, { ok: false, error: 'bad_request', message: 'Invalid request URL.' });
+  }
+
+  let pathname;
+  try {
+    pathname = decodeURIComponent(url.pathname);
+  } catch {
+    return sendJson(res, 400, { ok: false, error: 'bad_request', message: 'Invalid request path.' });
+  }
+
+  if (pathname === '/api' || pathname.startsWith('/api/')) {
+    return handleApi(req, res, pathname, url, ctx);
+  }
+
+  return serveStatic(req, res, pathname, ctx);
+}
+
+function createApp(overrides = {}) {
+  const config = loadConfig(overrides);
+  const galleryStore = new GalleryStore(config);
+  const rateLimits = new RateLimitStore(config.rateLimitFile, config.rateLimit);
+  const moments = new MomentsService({ config, galleryStore, rateLimits });
+  const ctx = {
+    config,
+    galleryStore,
+    rateLimits,
+    moments,
+    loginAttempts: new Map()
+  };
+
+  const server = http.createServer((req, res) => {
+    handleRequest(req, res, ctx).catch((error) => sendError(res, error));
+  });
+
+  server.headersTimeout = 25 * 1000;
+  server.requestTimeout = 60 * 1000;
+  server.on('clientError', (error, socket) => {
+    if (socket.writable) socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
+  });
+
+  return { server, config, ctx };
+}
+
+function start() {
+  loadEnvFile(path.join(__dirname, '.env'));
+
+  const { server, config } = createApp();
+  const provider = resolveProvider(config);
+
+  server.on('error', (error) => {
+    console.error(`[labroute] Server could not start: ${error.message}`);
+    process.exitCode = 1;
+  });
+
+  server.listen(config.port, config.host, async () => {
+    const admins = await loadAdminEmails(config);
+
+    console.log('');
+    console.log('  LabRoute · Lab Moments');
+    console.log(`  ────────────────────────────────────────────`);
+    console.log(`  Local:     http://localhost:${config.port}`);
+    console.log(`  Bind:      ${config.host}:${config.port}`);
+    console.log(`  Uploads:   ${Math.round(config.maxUploadBytes / (1024 * 1024))} MB max · ${config.cooldownMinutes} min cooldown`);
+    console.log(`  Storage:   ${config.uploadDir}`);
+    console.log(
+      `  Email:     ${provider || 'not configured'}${admins.length ? ` → ${admins.length} admin(s)` : ''}`
+    );
+    console.log('');
+  });
+
+  const shutdown = (signal) => {
+    console.log(`[labroute] ${signal} received; shutting down.`);
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 3000).unref();
+  };
+
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+}
+
+if (require.main === module) {
+  start();
+}
+
+module.exports = { createApp };

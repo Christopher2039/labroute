@@ -1,0 +1,22 @@
+{
+  "name": "labroute",
+  "version": "1.0.0",
+  "private": true,
+  "description": "LabRoute — UNIBEN ELA report repository with a community lab moments gallery.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test tests/moments.test.js tests/email.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "labroute",
+    "uniben",
+    "engineering",
+    "lab-reports"
+  ],
+  "license": "UNLICENSED"
+}

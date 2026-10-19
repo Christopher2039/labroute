@@ -1,0 +1,15 @@
+# Runtime state and secrets (visitor rate limits, cookie key, notification log)
+data/runtime/
+data/private/
+
+# Local environment configuration
+.env
+.env.local
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Editor / OS noise
+.DS_Store
+Thumbs.db

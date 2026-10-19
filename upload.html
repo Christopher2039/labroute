@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description"
+        content="Share a moment from your lab session with the LabRoute community gallery. One photo per visitor every 30 minutes." />
+    <title>Share a Lab Moment — LabRoute</title>
+
+    <!-- Favicon & Theme Color -->
+    <link rel="icon" href="assets/other_images/labroute_favicon.png" type="image/x-icon" />
+
+    <!-- Fonts & Material Symbols -->
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+
+    <!-- Modular Stylesheets -->
+    <link rel="stylesheet" href="styles/global.css" />
+    <link rel="stylesheet" href="styles/upload.css" />
+
+    <!-- Vercel Web Analytics -->
+    <script defer src="https://cdn.vercel-insights.com/v1/script.js"></script>
+</head>
+
+<body data-page="upload">
+    <!-- Injected automatically by layout.js -->
+    <header id="site-header"></header>
+
+    <main class="upload-main">
+        <!-- Intro -->
+        <section class="upload-hero">
+            <div class="container upload-hero-inner">
+                <span class="badge-tag">Community Gallery</span>
+                <h1 class="upload-title">
+                    Share a moment<br />
+                    <em>from the bench.</em>
+                </h1>
+                <p class="upload-subtitle">
+                    A setup you are proud of. A late-night calibration. The team that finally got the readings
+                    to behave. Add your photo to the living LabRoute archive and let the next engineer see how
+                    the work really happens.
+                </p>
+
+                <div class="upload-hero-meta">
+                    <span>
+                        <span class="material-symbols-outlined" aria-hidden="true">photo_camera</span>
+                        JPEG, PNG or WebP
+                    </span>
+                    <span>
+                        <span class="material-symbols-outlined" aria-hidden="true">scale</span>
+                        Up to 8 MB
+                    </span>
+                    <span>
+                        <span class="material-symbols-outlined" aria-hidden="true">schedule</span>
+                        1 photo every 30 minutes
+                    </span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Upload workspace -->
+        <section class="container upload-workspace" id="uploadWorkspace">
+            <div class="upload-card" id="uploadPanel">
+                <div class="upload-card-heading">
+                    <span class="step-pill">01</span>
+                    <div>
+                        <h2>Choose your photo</h2>
+                        <p>Use the original file where possible. Clear, well-lit lab photos work best.</p>
+                    </div>
+                </div>
+
+                <div class="dropzone" id="dropzone" role="button" tabindex="0"
+                    aria-controls="photoInput" aria-label="Choose a lab photo to upload">
+                    <span class="dropzone-icon material-symbols-outlined" aria-hidden="true">add_photo_alternate</span>
+                    <strong>Drop your lab photo here</strong>
+                    <span class="dropzone-hint">or click to browse your device</span>
+                    <span class="dropzone-browse">Browse files</span>
+                </div>
+
+                <input type="file" id="photoInput" class="visually-hidden"
+                    accept="image/jpeg,image/png,image/webp" />
+
+                <div class="photo-preview" id="photoPreview" hidden>
+                    <img id="previewImage" alt="Preview of the lab moment you selected" />
+                    <div class="photo-preview-info">
+                        <div class="photo-preview-text">
+                            <strong id="previewName">photo.jpg</strong>
+                            <span id="previewMeta">—</span>
+                        </div>
+                        <button type="button" class="photo-remove" id="removePhoto">
+                            <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+                            Remove
+                        </button>
+                    </div>
+                </div>
+
+                <div class="cooldown-banner" id="cooldownBanner" role="status" aria-live="polite" hidden>
+                    <span class="material-symbols-outlined" aria-hidden="true">timer</span>
+                    <div>
+                        <strong id="cooldownTitle">You are in a sharing cooldown</strong>
+                        <p id="cooldownText">Please wait before uploading another moment.</p>
+                    </div>
+                </div>
+
+                <form id="momentForm" class="moment-form" novalidate>
+                    <div class="upload-card-heading step-two">
+                        <span class="step-pill">02</span>
+                        <div>
+                            <h2>Tell us about it</h2>
+                            <p>A short caption helps visitors understand what they are looking at.</p>
+                        </div>
+                    </div>
+
+                    <div class="form-field caption-field">
+                        <label for="caption" class="form-label">
+                            Caption <span class="required-mark">required</span>
+                        </label>
+                        <textarea id="caption" name="caption" class="input-control textarea-control" rows="3"
+                            maxlength="160" placeholder="e.g. Calibrating the oscilloscope during our EEE 301 lab"
+                            required></textarea>
+                        <span class="char-count"><span id="captionCount">0</span>/160</span>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-field">
+                            <label for="contributor" class="form-label">
+                                Your name <span class="optional-mark">optional</span>
+                            </label>
+                            <input type="text" id="contributor" name="contributor" class="input-control"
+                                maxlength="60" placeholder="e.g. Ada O." autocomplete="name" />
+                        </div>
+
+                        <div class="form-field">
+                            <label for="uploaderEmail" class="form-label">
+                                Email <span class="optional-mark">optional, never published</span>
+                            </label>
+                            <input type="email" id="uploaderEmail" name="email" class="input-control"
+                                maxlength="160" placeholder="you@student.uniben.edu" autocomplete="email" />
+                        </div>
+                    </div>
+
+                    <label class="consent-row" for="consent">
+                        <input type="checkbox" id="consent" name="consent" />
+                        <span>
+                            I took this photo (or have permission to share it), and I am happy for it to
+                            appear publicly in the LabRoute gallery.
+                        </span>
+                    </label>
+
+                    <!-- Honeypot: invisible to people, tempting to bots -->
+                    <div class="hp-field" aria-hidden="true">
+                        <label for="website">Leave this field blank</label>
+                        <input type="text" id="website" name="website" tabindex="-1" autocomplete="off" />
+                    </div>
+
+                    <div class="form-alert" id="formAlert" role="alert" hidden></div>
+
+                    <div class="submit-row">
+                        <p class="submit-note">
+                            <span class="material-symbols-outlined" aria-hidden="true">info</span>
+                            Your photo becomes image 1. Every existing gallery photo shifts one place to the right.
+                        </p>
+
+                        <button type="submit" id="submitBtn" class="btn btn-gold upload-submit" disabled>
+                            <span class="material-symbols-outlined" aria-hidden="true">cloud_upload</span>
+                            <span id="submitLabel">Publish my moment</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <aside class="upload-aside" aria-label="Upload guidance">
+                <div class="upload-aside-card">
+                    <span class="badge-tag-gold">How it works</span>
+                    <ol class="upload-steps">
+                        <li>
+                            <span class="step-number">1</span>
+                            <div>
+                                <strong>Pick a photo</strong>
+                                <p>Preview it here before anything is sent.</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="step-number">2</span>
+                            <div>
+                                <strong>Add a caption</strong>
+                                <p>Say what is happening and where the moment was captured.</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="step-number">3</span>
+                            <div>
+                                <strong>Publish</strong>
+                                <p>Your moment appears first in the gallery, and the admin team gets an email alert.</p>
+                            </div>
+                        </li>
+                    </ol>
+                </div>
+
+                <div class="upload-aside-card">
+                    <h3>
+                        <span class="material-symbols-outlined" aria-hidden="true">photo_library</span>
+                        What makes a great moment
+                    </h3>
+                    <ul class="upload-guidelines">
+                        <li>Real lab setups, apparatus, workshops, or project teams.</li>
+                        <li>Good light, a clear subject, and as little blur as possible.</li>
+                        <li>No faces if the people pictured have not agreed to be shared.</li>
+                        <li>No exam papers, answer sheets, or confidential material.</li>
+                    </ul>
+                </div>
+
+                <div class="upload-aside-card upload-privacy">
+                    <h3>
+                        <span class="material-symbols-outlined" aria-hidden="true">shield</span>
+                        Privacy, plainly
+                    </h3>
+                    <p>
+                        We never publish your email address. To keep the gallery fair, the service stores a
+                        random visitor cookie, a random browser device id, and a hashed cooldown key — no
+                        account required. Your photo and caption are public once published.
+                    </p>
+                </div>
+
+                <a href="index.html#Gallery" class="btn btn-outline upload-back-btn">
+                    <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
+                    Back to the gallery
+                </a>
+            </aside>
+        </section>
+
+        <!-- Success state -->
+        <section class="container upload-success" id="successPanel" tabindex="-1" aria-live="polite" hidden>
+            <div class="success-card">
+                <span class="success-icon material-symbols-outlined" aria-hidden="true">check_circle</span>
+                <span class="badge-tag">Published to the archive</span>
+                <h2 class="success-title">Your moment is live.</h2>
+                <p class="success-subtitle" id="successMessage">
+                    It is now image 1 in the homepage gallery. Every existing photo moved one place to the right.
+                </p>
+
+                <div class="success-preview">
+                    <img id="successImage" alt="" />
+                    <div class="success-preview-text">
+                        <h3 id="successCaption"></h3>
+                        <p id="successMeta"></p>
+                    </div>
+                </div>
+
+                <div class="success-actions">
+                    <a href="index.html#Gallery" class="btn btn-gold">
+                        <span class="material-symbols-outlined" aria-hidden="true">photo_library</span>
+                        See it in the gallery
+                    </a>
+                    <button type="button" class="btn btn-outline" id="shareAnotherBtn" disabled>
+                        <span class="material-symbols-outlined" aria-hidden="true">add_a_photo</span>
+                        Share another
+                    </button>
+                </div>
+
+                <p class="success-cooldown" id="successCooldown" aria-live="polite"></p>
+            </div>
+        </section>
+    </main>
+
+    <!-- Injected automatically by layout.js -->
+    <footer id="site-footer"></footer>
+
+    <!-- Scripts -->
+    <script src="js/layout.js"></script>
+    <script src="js/upload.js"></script>
+</body>
+
+</html>
