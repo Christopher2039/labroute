@@ -17,21 +17,21 @@
 /* Products Grid */
 .products-grid {
   display: grid;
-  grid-template-columns: 1fr; 
+  grid-template-columns: 1fr;
   gap: 2.5rem;
-  align-items: stretch;
+  align-items: flex-end;
 }
 
 
 /* Individual Product Card */
 .product-card {
+  margin: 0 8%;
   background: var(--surface-card);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-md) 8px;
   box-shadow: var(--shadow-sm);
   display: grid;
-  grid-template-columns: 420px 1fr; 
-  align-stretch;
+  grid-template-columns: 420px 1fr;
   transition: transform var(--transition-normal), box-shadow var(--transition-normal), border-color var(--transition-normal);
   position: relative;
   overflow: hidden;
@@ -90,141 +90,144 @@
 
 @media (max-width: 968px) {
   .product-card {
-    grid-template-columns: 1fr; 
+    grid-template-columns: 1fr;
   }
-  
+
   .product-image-container {
     height: 200px;
     border-right: none;
     border-bottom: 1px solid var(--border);
   }
 
-/* Card Top Metadata */
-.product-top-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-}
+  /* Card Top Metadata */
+  .product-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+  }
 
-.product-icon-box {
-  width: 52px;
-  height: 52px;
-  border-radius: var(--radius-sm);
-  background: var(--surface-tint);
-  border: 1px solid var(--border);
-  color: var(--primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+  .product-icon-box {
+    width: 52px;
+    height: 52px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-tint);
+    border: 1px solid var(--border);
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 
-.product-icon-box .material-symbols-outlined {
-  font-size: 28px;
-}
+  .product-icon-box .material-symbols-outlined {
+    font-size: 28px;
+  }
 
-.product-status-pill {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--primary-light);
-  background: var(--surface-tint);
-  border: 1px solid var(--border);
-  padding: 0.25rem 0.65rem;
-  border-radius: var(--radius-pill);
-}
+  .product-status-pill {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--primary-light);
+    background: var(--surface-tint);
+    border: 1px solid var(--border);
+    padding: 0.25rem 0.65rem;
+    border-radius: var(--radius-pill);
+  }
 
-/* Product Content */
-.product-body {
-  margin-bottom: 2rem;
-  flex: 1;
-}
+  /* Product Content */
+  .product-body {
+    margin-bottom: 2rem;
+    flex: 1;
+  }
 
-.product-name {
-  font-family: var(--font-serif);
-  font-size: 1.6rem;
-  font-weight: 700;
-  color: var(--primary);
-  margin: 0 0 0.4rem;
-  letter-spacing: -0.01em;
-}
+  .product-name {
+    font-family: var(--font-serif);
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--primary);
+    margin: 0 0 0.4rem;
+    letter-spacing: -0.01em;
+  }
 
-.product-tagline {
-  font-size: 0.938rem;
-  font-weight: 600;
-  color: var(--text-main);
-  line-height: 1.4;
-  margin-bottom: 0.85rem;
-}
+  .product-tagline {
+    font-size: 0.938rem;
+    font-weight: 600;
+    color: var(--text-main);
+    line-height: 1.4;
+    margin-bottom: 0.85rem;
+  }
 
-.product-desc {
-  font-size: 0.875rem;
-  color: var(--text-muted);
-  line-height: 1.65;
-  margin-bottom: 1.25rem;
-}
+  .product-desc {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    line-height: 1.65;
+    margin-bottom: 1.25rem;
+  }
 
-/* Tags & Developer Credit */
-.product-tags-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-bottom: 1rem;
-}
+  /* Tags & Developer Credit */
+  .product-tags-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 1rem;
+  }
 
-.product-tag-chip {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--primary-light);
-  background: var(--surface-tint);
-  padding: 0.15rem 0.5rem;
-  border-radius: var(--radius-sm);
-}
+  .product-tag-chip {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--primary-light);
+    background: var(--surface-tint);
+    padding: 0.15rem 0.5rem;
+    border-radius: var(--radius-sm);
+  }
 
-.product-dev-credit {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.813rem;
-  color: var(--text-muted);
-}
+  .product-dev-credit {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.813rem;
+    color: var(--text-muted);
+  }
 
-.product-dev-credit strong {
-  color: var(--text-main);
-}
+  .product-dev-credit strong {
+    color: var(--text-main);
+  }
 
-/* Card Action Button */
-.product-footer {
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--border);
-}
+  /* Card Action Button */
+  .product-footer {
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border);
+  }
 
-.btn-product-launch {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 0.5rem;
-  text-decoration: none;
-}
+  .btn-product-launch {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+  }
 
-/* Loading state */
-.loading-state {
-  grid-column: 1 / -1;
-  text-align: center;
-  padding: 4rem 0;
-  color: var(--text-muted);
-}
+  /* Loading state */
+  .loading-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 4rem 0;
+    color: var(--text-muted);
+  }
 
-.loading-state .spinning-icon {
-  font-size: 36px;
-  color: var(--primary);
-  animation: spin 1.2s linear infinite;
-  margin-bottom: 0.5rem;
+  .loading-state .spinning-icon {
+    font-size: 36px;
+    color: var(--primary);
+    animation: spin 1.2s linear infinite;
+    margin-bottom: 0.5rem;
+  }
 }
 
 @keyframes spin {
-  100% { transform: rotate(360deg); }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Responsive */
@@ -232,7 +235,7 @@
   .others-page-main {
     padding-top: 100px;
   }
-  
+
   .products-grid {
     grid-template-columns: 1fr;
   }
